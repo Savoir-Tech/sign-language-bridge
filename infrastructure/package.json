@@ -1,0 +1,13 @@
+{
+  "name": "sign-language-bridge-infrastructure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Infrastructure-as-code (e.g., AWS CDK) for Sign Language Bridge.",
+  "scripts": {
+    "build": "tsc",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff"
+  }
+}

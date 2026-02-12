@@ -1,0 +1,7 @@
+# Backend Python dependencies for Sign Language Bridge.
+# Keep this minimal for now; add concrete versions as components are implemented.
+
+# Example (uncomment when needed):
+# boto3
+# opencv-python-headless
+# mediapipe
