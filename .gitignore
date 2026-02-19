@@ -219,7 +219,6 @@ cursorrules
 # ML data directories (too large for git)
 ml/data/ASL_Citizen/
 ml/data/processed/
-ml/data/raw/
 ml/trained_models/
 ml/logs/
 
@@ -229,5 +228,10 @@ ml/logs/
 
 # Trained model artifacts
 backend/trained_models/*.pth
+
+#Extras
 .claude
 ASL-citizen-code-main
+SETUP_VENV.md
+ASL_CITIZEN_SETUP.md
+TRAINING_GUIDE.md

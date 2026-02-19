@@ -21,36 +21,36 @@ This is a **4-day hackathon project** — every decision prioritizes getting a w
 
 ```
 ┌──────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Webcam     │───▶│  MediaPipe Hands  │───▶│  ASL Classifier │
-│  (Browser)   │    │  (Landmark        │    │  (Trained on    │
-│              │    │   Extraction)     │    │   ASL Citizen)  │
+│   Webcam     │───▶│  MediaPipe Hands│───▶│  ASL Classifier │
+│  (Browser)   │    │  (Landmark       │    │  (Trained on    │
+│              │    │   Extraction)    │    │   ASL Citizen)  │
 └──────────────┘    └──────────────────┘    └────────┬────────┘
                                                       │
                                                       ▼
                                             ┌─────────────────┐
-                                            │   Redis Cache    │
-                                            │  (Frequent Sign  │
-                                            │   Lookup)        │
+                                            │   Redis Cache   │
+                                            │  (Frequent Sign │
+                                            │   Lookup)       │
                                             └────────┬────────┘
                                                       │
                                                       ▼
                                             ┌─────────────────┐
-                                            │  Text Generation │
-                                            │  (Gloss → Text)  │
+                                            │  Text Generation│
+                                            │  (Gloss → Text) │
                                             └────────┬────────┘
                                                       │
                                                       ▼
                                             ┌─────────────────┐
-                                            │  Amazon Nova     │
-                                            │  Micro           │
-                                            │  (EN → ES/FR)    │
+                                            │  Amazon Nova    │
+                                            │  Micro          │
+                                            │  (EN → ES/FR)   │
                                             └────────┬────────┘
                                                       │
                                                       ▼
                                             ┌─────────────────┐
-                                            │  Amazon Nova     │
-                                            │  Sonic (TTS)     │
-                                            │  → Speaker Out   │
+                                            │  Amazon Nova    │
+                                            │  Sonic (TTS)    │
+                                            │  → Speaker Out  │
                                             └─────────────────┘
 ```
 
@@ -321,17 +321,17 @@ Frequently signed words (HELLO, YES, NO, THANK-YOU) account for ~60-70% of all s
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                  Redis Cache                      │
-│                                                   │
-│  sign:landmarks:<hash>  →  {"sign": "HELLO",     │
-│                              "confidence": 0.96}  │
-│                                                   │
-│  tts:audio:<text_hash>  →  <audio_bytes>         │
-│                                                   │
-│  translation:<text>:<lang> → "Hola"              │
-│                                                   │
-│  stats:cache_hits        →  1542                  │
-│  stats:cache_misses      →  389                   │
+│                  Redis Cache                    │
+│                                                 │
+│  sign:landmarks:<hash>  →  {"sign": "HELLO",    │
+│                              "confidence": 0.96}│
+│                                                 │
+│  tts:audio:<text_hash>  →  <audio_bytes>        │
+│                                                 │
+│  translation:<text>:<lang> → "Hola"             │
+│                                                 │
+│  stats:cache_hits        →  1542                │
+│  stats:cache_misses      →  389                 │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -1173,42 +1173,42 @@ sign-language-bridge/
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER (React)                           │
-│                                                                  │
-│  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌─────────────┐ │
-│  │ Webcam   │  │ Transcript  │  │ Language  │  │ Audio       │ │
-│  │ Feed     │  │ Panel       │  │ Switcher  │  │ Player      │ │
-│  └────┬─────┘  └─────────────┘  └──────────┘  └─────────────┘ │
-│       │                                                          │
+│                        BROWSER (React)                          │
+│                                                                 │
+│  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌─────────────┐   │
+│  │ Webcam   │  │ Transcript  │  │ Language │  │ Audio       │   │
+│  │ Feed     │  │ Panel       │  │ Switcher │  │ Player      │   │
+│  └────┬─────┘  └─────────────┘  └──────────┘  └─────────────┘   │
+│       │                                                         │
 │       │  frames (base64 JPEG @ 10fps)                           │
-│       ▼                                                          │
-│  ┌────────────────────────┐                                      │
-│  │ WebSocket Client       │                                      │
-│  │ ws://localhost:8000    │                                      │
-│  └────────────┬───────────┘                                      │
-└───────────────┼──────────────────────────────────────────────────┘
+│       ▼                                                         │
+│  ┌────────────────────────┐                                     │
+│  │ WebSocket Client       │                                     │
+│  │ ws://localhost:8000    │                                     │
+│  └────────────┬───────────┘                                     │
+└───────────────┼─────────────────────────────────────────────────┘
                 │
                 ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                     BACKEND (FastAPI :8000)                        │
-│                                                                    │
-│  ┌───────────────┐    ┌───────────────┐    ┌──────────────────┐  │
-│  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text     │  │
-│  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │  │
-│  └───────────────┘    └───────┬───────┘    └────────┬─────────┘  │
+│                     BACKEND (FastAPI :8000)                       │
+│                                                                   │
+│  ┌───────────────┐    ┌───────────────┐    ┌──────────────────┐   │
+│  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text    │   │
+│  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │   │
+│  └───────────────┘    └───────┬───────┘    └────────┬─────────┘   │
 │                               │                      │            │
 │                               ▼                      ▼            │
-│                      ┌────────────────┐    ┌──────────────────┐  │
-│                      │  Redis Cache   │    │ Amazon Nova      │  │
-│                      │  :6379         │    │ Micro (Translate)│  │
-│                      │                │    └────────┬─────────┘  │
-│                      │ • Sign cache   │             │            │
-│                      │ • TTS cache    │             ▼            │
-│                      │ • Translation  │    ┌──────────────────┐  │
-│                      │   cache        │    │ Amazon Nova      │  │
-│                      └────────────────┘    │ Sonic (TTS)      │  │
-│                                            │ → Audio Stream   │  │
-│                                            └──────────────────┘  │
+│                      ┌────────────────┐    ┌──────────────────┐   │
+│                      │  Redis Cache   │    │ Amazon Nova      │   │
+│                      │  :6379         │    │ Micro (Translate)│   │
+│                      │                │    └────────┬─────────┘   │
+│                      │ • Sign cache   │             │             │
+│                      │ • TTS cache    │             ▼             │
+│                      │ • Translation  │    ┌──────────────────┐   │
+│                      │   cache        │    │ Amazon Nova      │   │
+│                      └────────────────┘    │ Sonic (TTS)      │   │
+│                                            │ → Audio Stream   │   │
+│                                            └──────────────────┘   │
 └───────────────────────────────────────────────────────────────────┘
 ```
 

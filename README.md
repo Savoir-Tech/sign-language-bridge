@@ -1,4 +1,4 @@
-# 🤟 Sign Language Bridge
+# Sign Language Bridge
 
 [![AWS Nova](https://img.shields.io/badge/AWS-Nova%20Sonic%20%2B%20Micro-FF9900?style=for-the-badge&logo=amazon-aws)](https://aws.amazon.com/bedrock/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
@@ -39,24 +39,24 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
                                                        ↓
                                                   Nova Sonic (Text-to-Speech)
                                                        ↓
-                                                  Audio Output 🔊
+                                                  Audio Output
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | React 18 + TypeScript + Vite + Tailwind CSS | Webcam capture, sign display, transcript UI |
-| **Backend** | Python 3.11 + FastAPI | WebSocket server, ML inference, API routes |
-| **ML Model** | PyTorch (Bidirectional LSTM) | Sign classification from landmark sequences |
-| **Hand Tracking** | MediaPipe Hands | Extract 21 hand landmarks per hand (126 values) |
-| **Cache** | Redis 7 | Frequent sign lookup, translation cache, TTS audio cache |
-| **Translation** | Amazon Nova Micro (Bedrock) | EN → ES/FR text translation |
-| **Text-to-Speech** | Amazon Nova Sonic (Bedrock) | Multilingual speech synthesis |
-| **Training Data** | ASL Citizen Dataset | Large-scale crowdsourced ASL videos from Deaf signers |
-| **Containerization** | Docker Compose | Single-command local deployment |
+| Layer                | Technology                                  | Purpose                                                  |
+| -------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| **Frontend**         | React 18 + TypeScript + Vite + Tailwind CSS | Webcam capture, sign display, transcript UI              |
+| **Backend**          | Python 3.11 + FastAPI                       | WebSocket server, ML inference, API routes               |
+| **ML Model**         | PyTorch (Bidirectional LSTM)                | Sign classification from landmark sequences              |
+| **Hand Tracking**    | MediaPipe Hands                             | Extract 21 hand landmarks per hand (126 values)          |
+| **Cache**            | Redis 7                                     | Frequent sign lookup, translation cache, TTS audio cache |
+| **Translation**      | Amazon Nova Micro (Bedrock)                 | EN → ES/FR text translation                              |
+| **Text-to-Speech**   | Amazon Nova Sonic (Bedrock)                 | Multilingual speech synthesis                            |
+| **Training Data**    | ASL Citizen Dataset                         | Large-scale crowdsourced ASL videos from Deaf signers    |
+| **Containerization** | Docker Compose                              | Single-command local deployment                          |
 
 ---
 
@@ -232,6 +232,7 @@ docker-compose up -d
 ```
 
 This boots three services:
+
 - **backend** — FastAPI on `http://localhost:8000`
 - **frontend** — React on `http://localhost:5173`
 - **redis** — Cache on `localhost:6379`
@@ -283,13 +284,13 @@ Send base64-encoded JPEG frames, receive sign predictions:
 
 ### REST
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/health` | Service health (Redis + model status) |
-| `GET` | `/api/signs` | List supported sign vocabulary |
-| `POST` | `/api/translate` | Translate text (EN → ES/FR via Nova Micro) |
-| `POST` | `/api/tts` | Text-to-speech (via Nova Sonic) |
-| `GET` | `/api/cache/stats` | Redis cache hit/miss statistics |
+| Method | Endpoint           | Description                                |
+| ------ | ------------------ | ------------------------------------------ |
+| `GET`  | `/api/health`      | Service health (Redis + model status)      |
+| `GET`  | `/api/signs`       | List supported sign vocabulary             |
+| `POST` | `/api/translate`   | Translate text (EN → ES/FR via Nova Micro) |
+| `POST` | `/api/tts`         | Text-to-speech (via Nova Sonic)            |
+| `GET`  | `/api/cache/stats` | Redis cache hit/miss statistics            |
 
 ---
 
@@ -322,6 +323,7 @@ jupyter notebook notebooks/train_asl_citizen.ipynb
 ### Target Vocabulary (MVP)
 
 50-100 most common signs prioritized for practical use:
+
 - **Greetings**: HELLO, GOODBYE, THANK-YOU, PLEASE, SORRY
 - **Questions**: WHAT, WHERE, WHEN, WHO, HOW, WHY
 - **Common**: YES, NO, HELP, WANT, NEED, NAME, UNDERSTAND
@@ -334,11 +336,11 @@ jupyter notebook notebooks/train_asl_citizen.ipynb
 
 Redis caches three things to minimize latency and API costs:
 
-| Cache Type | Key Pattern | TTL | Purpose |
-|------------|-------------|-----|---------|
-| Sign predictions | `sign:<landmark_hash>` | 1 hour | Skip LSTM inference for repeated signs |
-| Translations | `translation:<text_hash>` | 24 hours | Skip Nova Micro API call |
-| TTS audio | `tts:<text_lang_hash>` | 24 hours | Skip Nova Sonic API call |
+| Cache Type       | Key Pattern               | TTL      | Purpose                                |
+| ---------------- | ------------------------- | -------- | -------------------------------------- |
+| Sign predictions | `sign:<landmark_hash>`    | 1 hour   | Skip LSTM inference for repeated signs |
+| Translations     | `translation:<text_hash>` | 24 hours | Skip Nova Micro API call               |
+| TTS audio        | `tts:<text_lang_hash>`    | 24 hours | Skip Nova Sonic API call               |
 
 Frequent signs (HELLO, YES, NO, THANK-YOU) account for ~60-70% of all signing — caching these makes a major difference in response time.
 
@@ -370,7 +372,7 @@ Translates recognized English text to Spanish or French. Nova Micro is the faste
 Converts the final translated text into spoken audio. Supports English, Spanish, and French voices.
 
 ```
-"Hola, ¿cómo te llamas?" → Nova Sonic → 🔊 audio output
+"Hola, ¿cómo te llamas?" → Nova Sonic →  audio output
 ```
 
 Both services are accessed through Amazon Bedrock via `boto3`. All responses are cached in Redis to avoid repeated API calls for the same text.
@@ -412,7 +414,6 @@ curl -X POST http://localhost:8000/api/tts \
   -d '{"text": "Hello", "language": "en"}'
 ```
 
-
 ## Demo Flow
 
 ```
@@ -421,7 +422,7 @@ curl -X POST http://localhost:8000/api/tts \
 3. Sign "NAME" → "WHAT" → press End Sentence
 4. System outputs: "Hello, what is your name?"
 5. Switch language to Spanish (ES)
-6. Audio plays: "Hola, ¿cómo te llamas?" 🔊
+6. Audio plays: "Hola, ¿cómo te llamas?"
 7. Show cache stats: 79% hit rate
 ```
 
@@ -446,6 +447,6 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 **Built with ❤️ for accessibility**
 
-[⭐ Star this repo](https://github.com/yourusername/sign-language-bridge) | [🐛 Report Bug](https://github.com/yourusername/sign-language-bridge/issues) | [💡 Request Feature](https://github.com/yourusername/sign-language-bridge/issues)
+[⭐ Star this repo](https://github.com/yourusername/sign-language-bridge) | [ Report Bug](https://github.com/yourusername/sign-language-bridge/issues) | [ Request Feature](https://github.com/yourusername/sign-language-bridge/issues)
 
 </div>
