@@ -1,239 +1,156 @@
-# ML Training Pipeline - ASL Citizen Dataset
+# ML Pipeline - ASL Citizen LSTM Training
 
-Complete training pipeline for ASL sign language recognition using MediaPipe Hands and PyTorch LSTM.
+End-to-end pipeline for ASL sign language recognition using MediaPipe hand landmarks and a bidirectional LSTM classifier, trained on the [ASL Citizen](https://huggingface.co/datasets/asl-citizen/aslcitizen) dataset (83K+ videos, 2,748 sign classes).
 
-## 📁 Directory Structure
+## Directory Structure
 
 ```
 ml/
 ├── data/
-│   ├── raw/                    # Raw video files (organized by sign)
-│   ├── processed/              # Extracted landmark sequences (.npy files)
-│   └── sign_vocab.json         # Vocabulary mapping
+│   ├── ASL_Citizen/
+│   │   ├── splits/                  # Official train/val/test CSV splits
+│   │   └── videos/                  # Raw MP4 videos (~83K files)
+│   ├── data_csv/                    # Processed CSVs with pose mappings
+│   │   ├── train.csv                # 40,154 training samples
+│   │   ├── val.csv                  # 10,304 validation samples
+│   │   ├── test.csv                 # 32,941 test samples
+│   │   ├── pose_map_train.csv       # Video-to-pose file mappings
+│   │   ├── pose_map_val.csv
+│   │   └── pose_map_test.csv
+│   ├── processed/
+│   │   └── pose_per_files/          # Extracted hand landmark .npy files (~83K)
+│   └── sign_vocab.json              # Vocabulary: 2,748 sign classes
 ├── notebooks/
-│   └── train_asl_citizen.ipynb # Training notebook
-└── scripts/
-    ├── download_dataset.py     # Download/setup ASL Citizen dataset
-    └── extract_landmarks.py    # Extract hand landmarks from videos
+│   └── train_asl_citizen.ipynb      # Training notebook (alternative to CLI)
+├── scripts/
+│   ├── setup_dataset.py             # Step 1: Setup directories and copy splits
+│   ├── extract_landmarks.py         # Step 2: Extract hand landmarks from videos
+│   ├── asl_dataset.py               # PyTorch dataset loader
+│   ├── train_asl_lstm.py            # Step 3: Train LSTM classifier
+│   ├── run_full_training.bat        # One-click full pipeline (Windows)
+│   └── run_full_training.sh         # One-click full pipeline (Linux/Mac)
+├── trained_models/                  # Saved model checkpoints (generated)
+├── logs/                            # Training logs (generated)
+├── requirements.txt
+├── setup_venv.bat
+└── README.md
 ```
 
-## 🚀 Quick Start
+## Pipeline Overview
 
-### Step 1: Download Dataset
+### Step 1: Setup Dataset
 
 ```bash
-# Setup dataset structure (creates directories for 50 signs)
-python ml/scripts/download_dataset.py --num-signs 50
-
-# View dataset collection options
-python ml/scripts/download_dataset.py --sample-info
+cd ml/scripts
+python setup_dataset.py
 ```
 
-This creates:
-- `ml/data/raw/<SIGN_NAME>/` directories for each sign
-- `ml/data/sign_vocab.json` vocabulary mapping
+Copies the official ASL Citizen split CSVs into `data/data_csv/` and creates the output directory for extracted poses.
 
-**Note**: You'll need to add video files manually or collect your own data. For a hackathon MVP, recording 30 videos per sign (20-30 signs) is recommended.
-
-### Step 2: Add Video Data
-
-Place your ASL sign videos in the corresponding directories:
-
-```
-ml/data/raw/
-├── HELLO/
-│   ├── video_001.mp4
-│   ├── video_002.mp4
-│   └── ...
-├── GOODBYE/
-│   ├── video_001.mp4
-│   └── ...
-└── ...
-```
-
-**Recommended for MVP**:
-- 20-30 sign classes
-- 30 videos per sign
-- Total: ~600-900 videos
-- This provides enough data for training and demo
-
-### Step 3: Extract Landmarks
+### Step 2: Extract Hand Landmarks
 
 ```bash
-# Extract hand landmarks from all videos
-python ml/scripts/extract_landmarks.py --num-signs 50
-
-# With custom parameters
-python ml/scripts/extract_landmarks.py \
-    --num-signs 30 \
-    --sequence-length 30 \
-    --confidence 0.5
+python extract_landmarks.py --split train
+python extract_landmarks.py --split val
+python extract_landmarks.py --split test
 ```
 
-This processes each video:
-- Extracts 30 frames uniformly from each video
-- Runs MediaPipe Hands to get landmarks
-- Saves as `.npy` files in `ml/data/processed/`
+Processes each video with MediaPipe Hands and saves a `.npy` file per video:
+- **42 keypoints** (21 per hand) x **3 coordinates** (x, y, z) = **126 features** per frame
+- Output: `data/processed/pose_per_files/<video_id>.npy`
+- Estimated time: ~10-20 hours for the training split (CPU-bound)
 
-**Output format**: Each `.npy` file contains a `(30, 126)` array:
-- 30 frames per video
-- 126 features: 2 hands × 21 landmarks × 3 coords (x, y, z)
-
-### Step 4: Train Model
-
-Open and run the training notebook:
+### Step 3: Train LSTM
 
 ```bash
-jupyter notebook ml/notebooks/train_asl_citizen.ipynb
+python train_asl_lstm.py \
+    --epochs 100 \
+    --batch-size 32 \
+    --hidden-size 256 \
+    --num-layers 2 \
+    --lr 1e-3 \
+    --max-frames 30 \
+    --save-every 5
 ```
 
-Or use Jupyter Lab:
+Or run the entire pipeline end-to-end:
 
 ```bash
-jupyter lab ml/notebooks/train_asl_citizen.ipynb
+# Windows
+run_full_training.bat
+
+# Linux/Mac
+bash run_full_training.sh
 ```
 
-The notebook will:
-1. Load processed landmarks
-2. Train bidirectional LSTM classifier
-3. Evaluate on test set
-4. Save model to `backend/trained_models/asl_classifier.pth`
-5. Save vocabulary to `backend/trained_models/sign_vocab.json`
+## Model Architecture
 
-## 🧠 Model Architecture
-
-```python
-ASLClassifier(
-    input_size=126,      # Hand landmarks
-    hidden_size=256,     # LSTM hidden units
-    num_layers=2,        # Bidirectional LSTM layers
-    num_classes=50,      # Number of signs
-    dropout=0.3
-)
+```
+ASLLSTMClassifier
+├── Bidirectional LSTM (2 layers)
+│   ├── input_size:  126  (42 hand keypoints x 3 coords)
+│   ├── hidden_size: 256
+│   └── dropout:     0.3
+├── FC1: Linear(512 -> 256) + ReLU + Dropout(0.3)
+└── FC2: Linear(256 -> 2,748 classes)
 ```
 
-**Architecture**:
-- Input: (batch, 30, 126) - 30 frames × 126 hand landmarks
-- LSTM: 2 layers, bidirectional, hidden_size=256
-- Output: (batch, num_classes) - sign probabilities
+| Detail       | Value                     |
+|--------------|---------------------------|
+| Input shape  | `(batch, 30, 126)`        |
+| Output shape | `(batch, 2748)`           |
+| Optimizer    | Adam (lr=1e-3)            |
+| Scheduler    | CosineAnnealingLR (T=10)  |
+| Loss         | CrossEntropyLoss          |
 
-**Training**:
-- Optimizer: Adam (lr=0.001)
-- Loss: CrossEntropyLoss
-- Scheduler: ReduceLROnPlateau
-- Train/Val/Test split: 80/10/10
+## Dataset Stats
 
-## 📊 Expected Results
+| Split        | Samples    |
+|--------------|------------|
+| Train        | 40,154     |
+| Validation   | 10,304     |
+| Test         | 32,941     |
+| **Total**    | **83,399** |
+| **Classes**  | **2,748**  |
 
-For a well-collected dataset with 30 samples per sign:
-- **Training accuracy**: 90-95% (after 20-30 epochs)
-- **Validation accuracy**: 85-90%
-- **Test accuracy**: 80-85%
+## CLI Arguments
 
-Lower accuracy is expected with:
-- Fewer training samples (<20 per sign)
-- More sign classes (>50)
-- Similar-looking signs (e.g., "M" vs "N")
+| Argument              | Default            | Description                          |
+|-----------------------|--------------------|--------------------------------------|
+| `--max-frames`        | `30`               | Max frames sampled per video         |
+| `--batch-size`        | `32`               | Training batch size                  |
+| `--num-workers`       | `4`                | Data loading workers                 |
+| `--use-test`          | `false`            | Include test set evaluation          |
+| `--hidden-size`       | `256`              | LSTM hidden units                    |
+| `--num-layers`        | `2`                | Number of LSTM layers                |
+| `--dropout`           | `0.3`              | Dropout rate                         |
+| `--epochs`            | `100`              | Training epochs                      |
+| `--lr`                | `1e-3`             | Learning rate                        |
+| `--scheduler-t-max`   | `10`               | Cosine annealing T_max               |
+| `--save-dir`          | `ml/trained_models`| Model checkpoint directory           |
+| `--log-dir`           | `ml/logs`          | Training log directory               |
+| `--save-every`        | `5`                | Save checkpoint every N epochs       |
 
-## 🎯 Vocabulary (MVP - 50 Signs)
+## Outputs
 
-### Greetings (6)
-HELLO, GOODBYE, THANK-YOU, PLEASE, SORRY, WELCOME
+After training, checkpoints are saved to `ml/trained_models/`:
 
-### Questions (6)
-WHAT, WHERE, WHEN, WHO, HOW, WHY
-
-### Common Words (14)
-YES, NO, HELP, WANT, NEED, NAME, UNDERSTAND, GOOD, BAD, MORE, STOP, GO, COME, SIT
-
-### Emergency (6)
-EMERGENCY, PAIN, DOCTOR, HOSPITAL, CALL, AMBULANCE
-
-### Numbers (11)
-ZERO, ONE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN
-
-### Family (6)
-MOTHER, FATHER, FAMILY, FRIEND, BROTHER, SISTER
-
-### Daily Life (12)
-EAT, DRINK, SLEEP, WORK, SCHOOL, HOME, BATHROOM, WATER, FOOD, MONEY, TIME, DAY
-
-### Emotions (6)
-HAPPY, SAD, ANGRY, TIRED, SICK, FINE
-
-### Actions (6)
-SEE, HEAR, SPEAK, READ, WRITE, LEARN
-
-## 🔧 Configuration
-
-Edit hyperparameters in the notebook (Cell 2):
-
-```python
-INPUT_SIZE = 126          # Don't change (hand landmarks)
-HIDDEN_SIZE = 256         # LSTM hidden units
-NUM_LAYERS = 2            # LSTM layers
-SEQUENCE_LENGTH = 30      # Frames per video
-BATCH_SIZE = 32           # Batch size
-LEARNING_RATE = 0.001     # Learning rate
-NUM_EPOCHS = 50           # Training epochs
-DROPOUT = 0.3             # Dropout probability
+```
+trained_models/
+├── best_model.pt                  # Best validation accuracy
+├── model_epoch_005_acc_X.XXXX.pt  # Periodic checkpoints
+├── model_epoch_010_acc_X.XXXX.pt
+└── gloss_dict.json                # Class index -> sign name mapping
 ```
 
-## 🐛 Troubleshooting
+To deploy, copy `best_model.pt` and `gloss_dict.json` to `backend/trained_models/`.
 
-### "No data found for sign 'XXX'"
-- Check that videos are in `ml/data/raw/XXX/` directory
-- Ensure video files have extensions: `.mp4`, `.avi`, or `.mov`
+## Troubleshooting
 
-### "Could not open video: XXX"
-- Verify video file is not corrupted
-- Try re-encoding with: `ffmpeg -i input.mp4 -c:v libx264 output.mp4`
+**MediaPipe import error** — Newer versions changed the API. Pin `mediapipe==0.10.32` or use the version in `requirements.txt`.
 
-### Low accuracy (<60%)
-- **Collect more data**: Aim for 30+ samples per sign
-- **Check video quality**: Ensure hands are clearly visible
-- **Reduce num_classes**: Start with 10-20 signs
-- **Increase epochs**: Train for 100+ epochs
-- **Data augmentation**: Add slight rotations/translations
+**Out of memory** — Reduce `--batch-size` to 16 or 8, or reduce `--hidden-size` to 128.
 
-### Out of memory errors
-- Reduce `BATCH_SIZE` (try 16 or 8)
-- Reduce `HIDDEN_SIZE` (try 128)
-- Use CPU instead of GPU (if GPU memory limited)
+**Slow landmark extraction** — This is CPU-bound. Process splits individually with `--split` and run overnight.
 
-## 📈 Next Steps After Training
-
-1. **Test the trained model**:
-   ```bash
-   # Start backend services
-   docker-compose up
-
-   # Test health endpoint
-   curl http://localhost:8000/api/health
-   ```
-
-2. **Integrate with backend**: Model is automatically saved to `backend/trained_models/`
-
-3. **Build frontend**: Create video capture component
-
-4. **Add AWS features**: Translation (Nova Micro) + TTS (Nova Sonic)
-
-## 📝 Notes
-
-- **Hackathon tip**: Start with 10-20 signs, train quickly, then expand
-- **Data collection**: Recording your own data is faster than downloading for MVP
-- **Performance**: CPU training is fine for <1000 samples, use GPU for larger datasets
-- **Deployment**: Model size is ~5-10 MB, suitable for Docker deployment
-
-## 🎥 Alternative Data Sources
-
-If you can't collect your own data:
-
-1. **ASL Alphabet (Kaggle)**: 87,000 images of fingerspelling
-   - https://www.kaggle.com/datasets/grassknoted/asl-alphabet
-
-2. **WLASL (Word-Level ASL)**: 2,000 words, 21,000 videos
-   - https://www.kaggle.com/datasets/risangbaskoro/wlasl-processed
-
-3. **ASL Citizen (Hugging Face)**: 2.7M videos, 2,700+ signs
-   - https://huggingface.co/datasets/asl-citizen/aslcitizen
+**NoneType .exists() error** — Fixed. The `pose_map_test` variable is `None` when `--use-test` is not passed; the null check now guards against this.
