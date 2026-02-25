@@ -20,8 +20,9 @@ import json
 # MediaPipe setup
 mp_hands = mp.solutions.hands
 
-# Paths
-DATA_DIR = Path(__file__).parent.parent / "data"
+# Paths — resolve() ensures absolute path regardless of working directory
+ML_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = ML_DIR / "data"
 VIDEOS_DIR = DATA_DIR / "ASL_Citizen" / "videos"  # Direct path to ASL Citizen videos
 POSE_DIR = DATA_DIR / "processed" / "pose_per_files"
 CSV_DIR = DATA_DIR / "data_csv"
@@ -264,9 +265,6 @@ Examples:
 
   # Process test set
   python extract_landmarks.py --split test
-
-Note: CSV files should be copied from ml/data/ASL_Citizen/splits/ to ml/data/data_csv/
-      Videos should be copied from ml/data/ASL_Citizen/videos/ to ml/data/raw/videos/
         """
     )
     parser.add_argument(

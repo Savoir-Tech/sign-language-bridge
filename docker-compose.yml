@@ -5,6 +5,8 @@ services:
       - "8000:8000"
     env_file: .env
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_started
     volumes:
@@ -22,6 +24,23 @@ services:
     depends_on:
       - backend
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: signbridge
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d signbridge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     ports:
@@ -31,4 +50,5 @@ services:
       - redisdata:/data
 
 volumes:
+  pgdata:
   redisdata:
