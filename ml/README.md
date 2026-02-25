@@ -1,6 +1,6 @@
-# ML Pipeline - ASL Citizen LSTM Training
+# ML Pipeline - ASL Citizen Two-Phase LSTM Training
 
-End-to-end pipeline for ASL sign language recognition using MediaPipe hand landmarks and a bidirectional LSTM classifier, trained on the [ASL Citizen](https://huggingface.co/datasets/asl-citizen/aslcitizen) dataset (83K+ videos, 2,748 sign classes).
+Two-phase transfer learning pipeline for ASL sign language recognition using MediaPipe hand landmarks and a bidirectional LSTM classifier, trained on the [ASL Citizen](https://huggingface.co/datasets/asl-citizen/aslcitizen) dataset (83K+ videos, 2,748 sign classes).
 
 ## Directory Structure
 
@@ -21,22 +21,36 @@ ml/
 │   │   └── pose_per_files/          # Extracted hand landmark .npy files (~83K)
 │   └── sign_vocab.json              # Vocabulary: 2,748 sign classes
 ├── notebooks/
-│   └── train_asl_citizen.ipynb      # Training notebook (alternative to CLI)
+│   └── train_asl_citizen.ipynb      # Training notebook (alternative)
 ├── scripts/
 │   ├── setup_dataset.py             # Step 1: Setup directories and copy splits
-│   ├── extract_landmarks.py         # Step 2: Extract hand landmarks from videos
-│   ├── asl_dataset.py               # PyTorch dataset loader
-│   ├── train_asl_lstm.py            # Step 3: Train LSTM classifier
+│   ├── extract_landmarks.py         # Steps 2-4: Extract hand landmarks from videos
+│   ├── asl_dataset.py               # PyTorch dataset loader (shared)
+│   ├── train_phase1.py              # Step 5: Train on top-N frequent classes
+│   ├── train_phase2.py              # Step 6: Fine-tune on all classes
 │   ├── run_full_training.bat        # One-click full pipeline (Windows)
 │   └── run_full_training.sh         # One-click full pipeline (Linux/Mac)
-├── trained_models/                  # Saved model checkpoints (generated)
+├── trained_models/
+│   ├── phase1/                      # Phase 1 checkpoints (generated)
+│   └── phase2/                      # Phase 2 checkpoints (generated)
 ├── logs/                            # Training logs (generated)
 ├── requirements.txt
 ├── setup_venv.bat
 └── README.md
 ```
 
-## Pipeline Overview
+## Training Strategy
+
+With 2,748 classes and only ~14 samples per class on average, training directly on the full dataset leads to overfitting. The two-phase approach solves this:
+
+**Phase 1** — Train on the top-N most frequent classes (~150) where there's enough data per class to learn strong LSTM representations.
+
+**Phase 2** — Transfer those learned representations to all 2,748 classes using gradual unfreezing:
+- Stage A: Freeze LSTM + fc1, train only the new fc2 head
+- Stage B: Unfreeze fc1, keep LSTM frozen
+- Stage C: Unfreeze everything, fine-tune end-to-end with low LR
+
+## Pipeline
 
 ### Step 1: Setup Dataset
 
@@ -45,9 +59,9 @@ cd ml/scripts
 python setup_dataset.py
 ```
 
-Copies the official ASL Citizen split CSVs into `data/data_csv/` and creates the output directory for extracted poses.
+Copies official ASL Citizen split CSVs into `data/data_csv/` and creates output directories.
 
-### Step 2: Extract Hand Landmarks
+### Steps 2-4: Extract Hand Landmarks
 
 ```bash
 python extract_landmarks.py --split train
@@ -58,22 +72,40 @@ python extract_landmarks.py --split test
 Processes each video with MediaPipe Hands and saves a `.npy` file per video:
 - **42 keypoints** (21 per hand) x **3 coordinates** (x, y, z) = **126 features** per frame
 - Output: `data/processed/pose_per_files/<video_id>.npy`
-- Estimated time: ~10-20 hours for the training split (CPU-bound)
+- Estimated time: ~10-20 hours for train, ~3-5 hours for val, ~8-15 hours for test
 
-### Step 3: Train LSTM
+### Step 5: Phase 1 — Top-N Class Training
 
 ```bash
-python train_asl_lstm.py \
+python train_phase1.py \
+    --top-n 150 \
     --epochs 100 \
     --batch-size 32 \
     --hidden-size 256 \
     --num-layers 2 \
-    --lr 1e-3 \
-    --max-frames 30 \
-    --save-every 5
+    --dropout 0.3 \
+    --lr 3e-4 \
+    --max-frames 30
 ```
 
-Or run the entire pipeline end-to-end:
+Filters the dataset to the 150 most frequent classes, trains from scratch, and saves the best checkpoint to `ml/trained_models/phase1/phase1_best.pt`.
+
+### Step 6: Phase 2 — Full Fine-Tuning
+
+```bash
+python train_phase2.py \
+    --phase1-checkpoint ../trained_models/phase1/phase1_best.pt \
+    --epochs-stage-a 10 \
+    --epochs-stage-b 10 \
+    --epochs-stage-c 80 \
+    --lr-stage-a 1e-3 \
+    --lr-stage-b 3e-4 \
+    --lr-stage-c 5e-5
+```
+
+Loads Phase 1 weights, replaces fc2 for 2,748 classes, and trains in three stages with gradual unfreezing. Best model saved to `ml/trained_models/phase2/phase2_best.pt`.
+
+### One-Click Full Pipeline
 
 ```bash
 # Windows
@@ -82,6 +114,8 @@ run_full_training.bat
 # Linux/Mac
 bash run_full_training.sh
 ```
+
+Runs all six steps sequentially.
 
 ## Model Architecture
 
@@ -92,16 +126,17 @@ ASLLSTMClassifier
 │   ├── hidden_size: 256
 │   └── dropout:     0.3
 ├── FC1: Linear(512 -> 256) + ReLU + Dropout(0.3)
-└── FC2: Linear(256 -> 2,748 classes)
+└── FC2: Linear(256 -> num_classes)
 ```
 
-| Detail       | Value                     |
-|--------------|---------------------------|
-| Input shape  | `(batch, 30, 126)`        |
-| Output shape | `(batch, 2748)`           |
-| Optimizer    | Adam (lr=1e-3)            |
-| Scheduler    | CosineAnnealingLR (T=10)  |
-| Loss         | CrossEntropyLoss          |
+| Detail       | Value                          |
+|--------------|--------------------------------|
+| Input shape  | `(batch, 30, 126)`             |
+| Output shape | `(batch, num_classes)`         |
+| Optimizer    | Adam (weight_decay=1e-4)       |
+| Scheduler    | CosineAnnealingLR              |
+| Loss         | CrossEntropyLoss               |
+| Early stop   | Patience = 10 epochs           |
 
 ## Dataset Stats
 
@@ -115,35 +150,61 @@ ASLLSTMClassifier
 
 ## CLI Arguments
 
-| Argument              | Default            | Description                          |
-|-----------------------|--------------------|--------------------------------------|
-| `--max-frames`        | `30`               | Max frames sampled per video         |
-| `--batch-size`        | `32`               | Training batch size                  |
-| `--num-workers`       | `4`                | Data loading workers                 |
-| `--use-test`          | `false`            | Include test set evaluation          |
-| `--hidden-size`       | `256`              | LSTM hidden units                    |
-| `--num-layers`        | `2`                | Number of LSTM layers                |
-| `--dropout`           | `0.3`              | Dropout rate                         |
-| `--epochs`            | `100`              | Training epochs                      |
-| `--lr`                | `1e-3`             | Learning rate                        |
-| `--scheduler-t-max`   | `10`               | Cosine annealing T_max               |
-| `--save-dir`          | `ml/trained_models`| Model checkpoint directory           |
-| `--log-dir`           | `ml/logs`          | Training log directory               |
-| `--save-every`        | `5`                | Save checkpoint every N epochs       |
+### train_phase1.py
+
+| Argument              | Default  | Description                          |
+|-----------------------|----------|--------------------------------------|
+| `--top-n`             | `150`    | Number of most frequent classes      |
+| `--max-frames`        | `30`     | Max frames sampled per video         |
+| `--batch-size`        | `32`     | Training batch size                  |
+| `--num-workers`       | `4`      | Data loading workers                 |
+| `--hidden-size`       | `256`    | LSTM hidden units                    |
+| `--num-layers`        | `2`      | Number of LSTM layers                |
+| `--dropout`           | `0.3`    | Dropout rate                         |
+| `--epochs`            | `100`    | Training epochs                      |
+| `--lr`                | `3e-4`   | Learning rate                        |
+| `--scheduler-t-max`   | `10`     | Cosine annealing T_max               |
+| `--save-every`        | `5`      | Save checkpoint every N epochs       |
+
+### train_phase2.py
+
+| Argument                  | Default  | Description                          |
+|---------------------------|----------|--------------------------------------|
+| `--phase1-checkpoint`     | required | Path to Phase 1 `.pt` file           |
+| `--max-frames`            | `30`     | Max frames sampled per video         |
+| `--batch-size`            | `32`     | Training batch size                  |
+| `--num-workers`           | `4`      | Data loading workers                 |
+| `--epochs-stage-a`        | `10`     | Epochs for Stage A (fc2 only)        |
+| `--epochs-stage-b`        | `10`     | Epochs for Stage B (fc1 + fc2)       |
+| `--epochs-stage-c`        | `80`     | Epochs for Stage C (full model)      |
+| `--lr-stage-a`            | `1e-3`   | LR for Stage A                       |
+| `--lr-stage-b`            | `3e-4`   | LR for Stage B                       |
+| `--lr-stage-c`            | `5e-5`   | LR for Stage C                       |
+| `--save-every`            | `5`      | Save checkpoint every N epochs       |
 
 ## Outputs
 
-After training, checkpoints are saved to `ml/trained_models/`:
-
 ```
 trained_models/
-├── best_model.pt                  # Best validation accuracy
-├── model_epoch_005_acc_X.XXXX.pt  # Periodic checkpoints
-├── model_epoch_010_acc_X.XXXX.pt
-└── gloss_dict.json                # Class index -> sign name mapping
+├── phase1/
+│   ├── phase1_best.pt                      # Best Phase 1 model
+│   ├── phase1_epoch_005_acc_X.XXXX.pt      # Periodic checkpoints
+│   ├── gloss_dict_phase1.json              # Phase 1 class mapping
+│   ├── filtered_train.csv                  # Filtered training CSV
+│   └── filtered_val.csv                    # Filtered validation CSV
+└── phase2/
+    ├── phase2_best.pt                      # Best Phase 2 model (deploy this)
+    ├── phase2_stageA_epoch_XXX_acc_X.pt    # Stage A checkpoints
+    ├── phase2_stageB_epoch_XXX_acc_X.pt    # Stage B checkpoints
+    ├── phase2_stageC_epoch_XXX_acc_X.pt    # Stage C checkpoints
+    └── gloss_dict_full.json                # Full 2,748-class mapping
 ```
 
-To deploy, copy `best_model.pt` and `gloss_dict.json` to `backend/trained_models/`.
+To deploy, copy to the backend:
+```bash
+cp ml/trained_models/phase2/phase2_best.pt backend/trained_models/asl_classifier.pth
+cp ml/trained_models/phase2/gloss_dict_full.json backend/trained_models/sign_vocab.json
+```
 
 ## Troubleshooting
 
@@ -153,4 +214,6 @@ To deploy, copy `best_model.pt` and `gloss_dict.json` to `backend/trained_models
 
 **Slow landmark extraction** — This is CPU-bound. Process splits individually with `--split` and run overnight.
 
-**NoneType .exists() error** — Fixed. The `pose_map_test` variable is `None` when `--use-test` is not passed; the null check now guards against this.
+**Phase 1 accuracy too low** — Try reducing `--top-n` (e.g., 100 or 50) to give more samples per class. Aim for 60-70%+ before moving to Phase 2.
+
+**Phase 2 diverges** — Lower `--lr-stage-c` further (e.g., `1e-5`). The LSTM weights from Phase 1 should mostly be preserved.

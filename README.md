@@ -8,7 +8,7 @@
 
 > **Real-time ASL interpretation powered by Amazon Nova — breaking communication barriers for 11+ million ASL users**
 
-Sign Language Bridge captures American Sign Language through your webcam, classifies signs using an LSTM model trained on the ASL Citizen dataset, and converts them to text and spoken audio in English, Spanish, or French using Amazon Nova Sonic. Frequently used signs are cached in Redis for instant lookup.
+Sign Language Bridge captures American Sign Language through your webcam, classifies signs using an LSTM model trained on the ASL Citizen dataset, and converts them to text and spoken audio in English, Spanish, or French using Amazon Nova Sonic. Frequently used signs are cached in Redis for instant lookup, and all translation history is persisted in PostgreSQL.
 
 ---
 
@@ -25,6 +25,7 @@ Sign Language Bridge provides **real-time ASL-to-speech translation** in three l
 3. **Redis caches** — Frequent signs are cached for instant lookup (~60-70% hit rate)
 4. **Nova translates** — Amazon Nova Micro translates text to Spanish or French
 5. **Nova speaks** — Amazon Nova Sonic converts text to spoken audio in real-time
+6. **Postgres persists** — Users, sessions, and translation history are stored in PostgreSQL
 
 ---
 
@@ -40,6 +41,8 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
                                                   Nova Sonic (Text-to-Speech)
                                                        ↓
                                                   Audio Output
+                                                       ↓
+                                                  PostgreSQL (History)
 ```
 
 ---
@@ -52,7 +55,9 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 | **Backend**          | Python 3.11 + FastAPI                       | WebSocket server, ML inference, API routes               |
 | **ML Model**         | PyTorch (Bidirectional LSTM)                | Sign classification from landmark sequences              |
 | **Hand Tracking**    | MediaPipe Hands                             | Extract 21 hand landmarks per hand (126 values)          |
+| **Database**         | PostgreSQL 16                               | Users, sessions, translation history                     |
 | **Cache**            | Redis 7                                     | Frequent sign lookup, translation cache, TTS audio cache |
+| **Auth**             | JWT (PyJWT)                                 | User authentication and session management               |
 | **Translation**      | Amazon Nova Micro (Bedrock)                 | EN → ES/FR text translation                              |
 | **Text-to-Speech**   | Amazon Nova Sonic (Bedrock)                 | Multilingual speech synthesis                            |
 | **Training Data**    | ASL Citizen Dataset                         | Large-scale crowdsourced ASL videos from Deaf signers    |
@@ -64,40 +69,47 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER (React)                           │
-│                                                                  │
-│  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌─────────────┐ │
-│  │ Webcam   │  │ Transcript  │  │ Language  │  │ Audio       │ │
-│  │ Feed     │  │ Panel       │  │ Switcher  │  │ Player      │ │
-│  └────┬─────┘  └─────────────┘  └──────────┘  └─────────────┘ │
+│                        BROWSER (React)                          │
+│                                                                 │
+│  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌─────────────┐   │
+│  │ Webcam   │  │ Transcript  │  │ Language │  │ Audio       │   │
+│  │ Feed     │  │ Panel       │  │ Switcher │  │ Player      │   │
+│  └────┬─────┘  └─────────────┘  └──────────┘  └─────────────┘   │
 │       │  frames (base64 JPEG @ 10fps)                           │
-│       ▼                                                          │
-│  ┌────────────────────────┐                                      │
-│  │ WebSocket Client       │                                      │
-│  └────────────┬───────────┘                                      │
-└───────────────┼──────────────────────────────────────────────────┘
+│       ▼                                                         │
+│  ┌────────────────────────┐                                     │
+│  │ WebSocket Client       │                                     │
+│  └────────────┬───────────┘                                     │
+└───────────────┼─────────────────────────────────────────────────┘
                 │
                 ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                     BACKEND (FastAPI :8000)                        │
-│                                                                    │
-│  ┌───────────────┐    ┌───────────────┐    ┌──────────────────┐  │
-│  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text     │  │
-│  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │  │
-│  └───────────────┘    └───────┬───────┘    └────────┬─────────┘  │
+│                     BACKEND (FastAPI :8000)                       │
+│                                                                   │
+│  ┌───────────────┐    ┌───────────────┐    ┌──────────────────┐   │
+│  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text    │   │
+│  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │   │
+│  └───────────────┘    └───────┬───────┘    └────────┬─────────┘   │
 │                               │                      │            │
 │                               ▼                      ▼            │
-│                      ┌────────────────┐    ┌──────────────────┐  │
-│                      │  Redis Cache   │    │ Amazon Nova      │  │
-│                      │  :6379         │    │ Micro (Translate)│  │
-│                      │                │    └────────┬─────────┘  │
-│                      │ • Sign cache   │             │            │
-│                      │ • TTS cache    │             ▼            │
-│                      │ • Translation  │    ┌──────────────────┐  │
-│                      │   cache        │    │ Amazon Nova      │  │
-│                      └────────────────┘    │ Sonic (TTS)      │  │
-│                                            │ → Audio Stream   │  │
-│                                            └──────────────────┘  │
+│                      ┌────────────────┐    ┌──────────────────┐   │
+│                      │  Redis Cache   │    │ Amazon Nova      │   │
+│                      │  :6379         │    │ Micro (Translate)│   │
+│                      │                │    └────────┬─────────┘   │
+│                      │ • Sign cache   │             │             │
+│                      │ • TTS cache    │             ▼             │
+│                      │ • Translation  │    ┌──────────────────┐   │
+│                      │   cache        │    │ Amazon Nova      │   │
+│                      └────────────────┘    │ Sonic (TTS)      │   │
+│                                            │ → Audio Stream   │   │
+│                      ┌────────────────┐    └──────────────────┘   │
+│                      │ PostgreSQL     │                           │
+│                      │ :5432          │                           │
+│                      │                │                           │
+│                      │ • Users        │                           │
+│                      │ • Sessions     │                           │
+│                      │ • Translations │                           │
+│                      └────────────────┘                           │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -109,69 +121,85 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 sign-language-bridge/
 ├── docker-compose.yml
 ├── .env
-├── backend/                        # Python FastAPI server
+├── sql/                               # Database schema
+│   └── init.sql                           # PostgreSQL init (users, sessions, translations)
+├── backend/                           # Python FastAPI server
 │   ├── src/
-│   │   ├── main.py                      # App entrypoint + lifespan
-│   │   ├── config.py                    # Pydantic settings
+│   │   ├── main.py                        # App entrypoint + lifespan
+│   │   ├── config.py                      # Pydantic settings
 │   │   ├── api/
 │   │   │   └── routes/
-│   │   │       ├── health.py            # GET /api/health
-│   │   │       ├── signs.py             # GET /api/signs
-│   │   │       ├── translate.py         # POST /api/translate
-│   │   │       ├── tts.py              # POST /api/tts
-│   │   │       └── websocket.py         # WS /ws/recognize
+│   │   │       ├── health.py              # GET /api/health
+│   │   │       ├── signs.py               # GET /api/signs
+│   │   │       ├── translate.py           # POST /api/translate
+│   │   │       ├── tts.py                 # POST /api/tts
+│   │   │       ├── auth.py                # POST /api/register, /api/login, /api/me
+│   │   │       ├── sessions.py            # CRUD /api/sessions
+│   │   │       └── websocket.py           # WS /ws/recognize
 │   │   ├── services/
-│   │   │   ├── model_service.py         # LSTM model + MediaPipe inference
-│   │   │   ├── cache_service.py         # Redis caching layer
-│   │   │   ├── gloss_service.py         # Gloss → natural text conversion
-│   │   │   ├── translation_service.py   # Nova Micro EN → ES/FR
-│   │   │   └── tts_service.py           # Nova Sonic text-to-speech
+│   │   │   ├── model_service.py           # LSTM model + MediaPipe inference
+│   │   │   ├── cache_service.py           # Redis caching layer
+│   │   │   ├── gloss_service.py           # Gloss → natural text conversion
+│   │   │   ├── translation_service.py     # Nova Micro EN → ES/FR
+│   │   │   ├── tts_service.py             # Nova Sonic text-to-speech
+│   │   │   ├── auth_service.py            # JWT token + password hashing
+│   │   │   └── db_service.py              # PostgreSQL connection pool (asyncpg)
 │   │   └── utils/
 │   │       └── logger.py
 │   ├── trained_models/
-│   │   ├── asl_classifier.pth           # Trained PyTorch weights
-│   │   └── sign_vocab.json              # Sign label → index mapping
+│   │   └── sign_vocab.json                # Sign label → index mapping
 │   ├── requirements.txt
 │   └── Dockerfile
-├── frontend/                       # React SPA
+├── frontend/                          # React SPA
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── main.tsx
 │   │   ├── components/
-│   │   │   ├── ui/                      # Button, Card, Badge
+│   │   │   ├── ui/                        # Button, Card, Badge
 │   │   │   ├── features/
-│   │   │   │   ├── VideoCapture.tsx     # Webcam + landmark overlay
-│   │   │   │   ├── SignDisplay.tsx      # Current sign + confidence
-│   │   │   │   ├── TranscriptPanel.tsx  # Running sentence transcript
-│   │   │   │   ├── LanguageSwitcher.tsx # EN/ES/FR toggle
-│   │   │   │   └── AudioPlayer.tsx     # TTS playback controls
+│   │   │   │   ├── VideoCapture.tsx       # Webcam + landmark overlay
+│   │   │   │   ├── SignDisplay.tsx        # Current sign + confidence
+│   │   │   │   ├── TranscriptPanel.tsx    # Running sentence transcript
+│   │   │   │   ├── LanguageSwitcher.tsx   # EN/ES/FR toggle
+│   │   │   │   └── AudioPlayer.tsx        # TTS playback controls
 │   │   │   └── layouts/
 │   │   │       └── MainLayout.tsx
 │   │   ├── lib/
-│   │   │   ├── api/client.ts            # REST + WebSocket client
+│   │   │   ├── api/client.ts              # REST + WebSocket client
 │   │   │   ├── hooks/
 │   │   │   │   ├── useWebSocket.ts
 │   │   │   │   └── useCamera.ts
-│   │   │   └── stores/appStore.ts       # Zustand state
+│   │   │   └── stores/appStore.ts         # Zustand state
 │   │   ├── styles/globals.css
 │   │   └── types/index.ts
 │   ├── vite.config.ts
 │   ├── tailwind.config.js
 │   └── package.json
-├── ml/                             # Model training
+├── ml/                                # Model training
 │   ├── notebooks/
 │   │   └── train_asl_citizen.ipynb
 │   ├── scripts/
-│   │   ├── download_dataset.py
-│   │   ├── extract_landmarks.py
-│   │   └── train_model.py
-│   └── data/                            # gitignored
+│   │   ├── asl_dataset.py                 # Dataset loader
+│   │   ├── extract_landmarks.py           # MediaPipe landmark extraction
+│   │   ├── setup_dataset.py               # Dataset download/setup
+│   │   ├── train_asl_lstm.py              # LSTM training script
+│   │   ├── run_full_training.sh           # Full pipeline runner (Linux/Mac)
+│   │   └── run_full_training.bat          # Full pipeline runner (Windows)
+│   ├── trained_models/                    # Training outputs
+│   │   ├── best_model.pt
+│   │   └── gloss_dict.json
+│   └── data/                              # gitignored
+│       ├── ASL_Citizen/                   # Raw dataset (videos + splits)
+│       └── processed/                     # Extracted landmarks
+├── ASL-citizen-code-main/             # Reference ASL Citizen codebase (I3D, ST-GCN)
 ├── scripts/
 │   ├── demo.sh
 │   └── test_pipeline.py
 └── docs/
-    ├── project_plan.md
-    └── demo_script.md
+    ├── AGENTS.md
+    ├── ASL_CITIZEN_SETUP.md
+    ├── SETUP_VENV.md
+    └── TRAINING_GUIDE.md
 ```
 
 ---
@@ -202,6 +230,9 @@ Create `.env` in the project root:
 BACKEND_PORT=8000
 ENVIRONMENT=development
 
+# PostgreSQL
+DATABASE_URL=postgresql://admin:password@postgres:5432/signbridge
+
 # Redis
 REDIS_URL=redis://redis:6379
 
@@ -209,6 +240,10 @@ REDIS_URL=redis://redis:6379
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
+
+# Auth (JWT)
+JWT_SECRET=change-this-secret-in-production
+JWT_EXPIRY_HOURS=24
 
 # Model
 MODEL_PATH=trained_models/asl_classifier.pth
@@ -231,10 +266,11 @@ SUPPORTED_LANGUAGES=en,es,fr
 docker-compose up -d
 ```
 
-This boots three services:
+This boots four services:
 
 - **backend** — FastAPI on `http://localhost:8000`
 - **frontend** — React on `http://localhost:5173`
+- **postgres** — PostgreSQL on `localhost:5432` (auto-initializes schema from `sql/init.sql`)
 - **redis** — Cache on `localhost:6379`
 
 ### 4. Verify
@@ -242,6 +278,9 @@ This boots three services:
 ```bash
 # Health check
 curl http://localhost:8000/api/health | jq .
+
+# PostgreSQL
+docker exec -it sign-language-bridge-postgres-1 psql -U admin -d signbridge -c '\dt'
 
 # Redis
 docker exec -it sign-language-bridge-redis-1 redis-cli PING
@@ -284,13 +323,20 @@ Send base64-encoded JPEG frames, receive sign predictions:
 
 ### REST
 
-| Method | Endpoint           | Description                                |
-| ------ | ------------------ | ------------------------------------------ |
-| `GET`  | `/api/health`      | Service health (Redis + model status)      |
-| `GET`  | `/api/signs`       | List supported sign vocabulary             |
-| `POST` | `/api/translate`   | Translate text (EN → ES/FR via Nova Micro) |
-| `POST` | `/api/tts`         | Text-to-speech (via Nova Sonic)            |
-| `GET`  | `/api/cache/stats` | Redis cache hit/miss statistics            |
+| Method   | Endpoint           | Description                                |
+| -------- | ------------------ | ------------------------------------------ |
+| `GET`    | `/api/health`      | Service health (Postgres + Redis + model)  |
+| `GET`    | `/api/signs`       | List supported sign vocabulary             |
+| `POST`   | `/api/translate`   | Translate text (EN → ES/FR via Nova Micro) |
+| `POST`   | `/api/tts`         | Text-to-speech (via Nova Sonic)            |
+| `POST`   | `/api/register`    | Register a new user                        |
+| `POST`   | `/api/login`       | Login and receive JWT token                |
+| `GET`    | `/api/me`          | Get current user profile (auth required)   |
+| `PUT`    | `/api/me`          | Update user profile (auth required)        |
+| `POST`   | `/api/sessions`    | Create a translation session               |
+| `GET`    | `/api/sessions`    | List user sessions                         |
+| `GET`    | `/api/sessions/:id`| Get session with translation history       |
+| `GET`    | `/api/cache/stats` | Redis cache hit/miss statistics            |
 
 ---
 
@@ -307,18 +353,24 @@ ASL Citizen Videos → Frame Extraction → MediaPipe Hands → Landmark Sequenc
 1. **Extract landmarks** — MediaPipe extracts 21 hand landmarks per hand (126 values for both hands) from each video frame
 2. **Build sequences** — Pad/truncate to 30-frame sequences per sign
 3. **Train LSTM** — Bidirectional LSTM with dropout → softmax over sign vocabulary
-4. **Export** — Save `asl_classifier.pth` + `sign_vocab.json` to `backend/trained_models/`
+4. **Export** — Save model weights + gloss dictionary to `ml/trained_models/`
 
 ```bash
-# Run training
+# Run training (full pipeline)
 cd ml
-python scripts/download_dataset.py
+./scripts/run_full_training.sh        # Linux/Mac
+scripts\run_full_training.bat          # Windows
+
+# Or run steps individually
+python scripts/setup_dataset.py
 python scripts/extract_landmarks.py
-python scripts/train_model.py
+python scripts/train_asl_lstm.py
 
 # Or use the notebook
 jupyter notebook notebooks/train_asl_citizen.ipynb
 ```
+
+See [docs/TRAINING_GUIDE.md](docs/TRAINING_GUIDE.md) and [docs/ASL_CITIZEN_SETUP.md](docs/ASL_CITIZEN_SETUP.md) for detailed instructions.
 
 ### Target Vocabulary (MVP)
 
@@ -357,6 +409,20 @@ docker exec -it sign-language-bridge-redis-1 redis-cli
 
 ---
 
+## Database Schema
+
+PostgreSQL stores user accounts, sessions, and translation history:
+
+| Table          | Purpose                                         |
+| -------------- | ----------------------------------------------- |
+| `users`        | User accounts (email, password hash, preferences) |
+| `sessions`     | Translation sessions per user                   |
+| `translations` | Individual translations with gloss sequences    |
+
+Schema is auto-initialized via `sql/init.sql` when the Postgres container starts.
+
+---
+
 ## Amazon Nova Integration
 
 ### Nova Micro — Translation
@@ -384,8 +450,12 @@ Both services are accessed through Amazon Bedrock via `boto3`. All responses are
 ### Run Without Docker
 
 ```bash
-# Terminal 1: Redis
+# Terminal 1: PostgreSQL + Redis
+docker run -d -p 5432:5432 -e POSTGRES_DB=signbridge -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password postgres:16-alpine
 docker run -d -p 6379:6379 redis:7-alpine
+
+# Initialize database schema
+psql -h localhost -U admin -d signbridge -f sql/init.sql
 
 # Terminal 2: Backend
 cd backend
@@ -412,6 +482,11 @@ curl -X POST http://localhost:8000/api/translate \
 curl -X POST http://localhost:8000/api/tts \
   -H "Content-Type: application/json" \
   -d '{"text": "Hello", "language": "en"}'
+
+# Register a user
+curl -X POST http://localhost:8000/api/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "secret", "display_name": "Test User"}'
 ```
 
 ## Demo Flow
@@ -445,8 +520,8 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 <div align="center">
 
-**Built with ❤️ for accessibility**
+**Built for accessibility**
 
-[⭐ Star this repo](https://github.com/yourusername/sign-language-bridge) | [ Report Bug](https://github.com/yourusername/sign-language-bridge/issues) | [ Request Feature](https://github.com/yourusername/sign-language-bridge/issues)
+[Report Bug](https://github.com/yourusername/sign-language-bridge/issues) | [Request Feature](https://github.com/yourusername/sign-language-bridge/issues)
 
 </div>
