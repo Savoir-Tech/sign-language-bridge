@@ -1076,7 +1076,7 @@ docker exec -it sign-language-bridge-redis-1 redis-cli
 ### Tech Stack
 
 | Layer | Technology | Why |
-|---|---|---|
+|-------|------------|-----|
 | **API Server** | Python + FastAPI | Native ML integration, async WebSocket support, fast dev |
 | **Frontend** | React + Vite + Tailwind CSS | Fast dev loop, clean UI, handles webcam well |
 | **ML Framework** | PyTorch + MediaPipe | Industry standard for CV + hand tracking |
