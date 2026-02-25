@@ -51,7 +51,7 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 
 | Layer                | Technology                                  | Purpose                                                  |
 | -------------------- | ------------------------------------------- | -------------------------------------------------------- |
-| **Frontend**         | React 18 + TypeScript + Vite + Tailwind CSS | Webcam capture, sign display, transcript UI              |
+| **Frontend**         | React 18 + TypeScript + Vite + Tailwind v4 + Zustand + Radix UI | Webcam capture, sign display, transcript UI, state management |
 | **Backend**          | Python 3.11 + FastAPI                       | WebSocket server, ML inference, API routes               |
 | **ML Model**         | PyTorch (Bidirectional LSTM)                | Sign classification from landmark sequences              |
 | **Hand Tracking**    | MediaPipe Hands                             | Extract 21 hand landmarks per hand (126 values)          |
@@ -68,21 +68,28 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER (React)                          │
-│                                                                 │
-│  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌─────────────┐   │
-│  │ Webcam   │  │ Transcript  │  │ Language │  │ Audio       │   │
-│  │ Feed     │  │ Panel       │  │ Switcher │  │ Player      │   │
-│  └────┬─────┘  └─────────────┘  └──────────┘  └─────────────┘   │
-│       │  frames (base64 JPEG @ 10fps)                           │
-│       ▼                                                         │
-│  ┌────────────────────────┐                                     │
-│  │ WebSocket Client       │                                     │
-│  └────────────┬───────────┘                                     │
-└───────────────┼─────────────────────────────────────────────────┘
-                │
-                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         BROWSER (React + Zustand)                     │
+│                                                                       │
+│  ┌──────────────┐  ┌───────────────┐  ┌────────────┐  ┌───────────┐  │
+│  │ Webcam Feed  │  │ Transcript    │  │ Language   │  │ Audio     │  │
+│  │ (useCamera)  │  │ Panel         │  │ Switcher   │  │ Player    │  │
+│  └──────┬───────┘  └───────────────┘  └────────────┘  └───────────┘  │
+│         │  frames (base64 JPEG @ 10fps)                               │
+│         ▼                                                             │
+│  ┌──────────────────────┐   ┌─────────────────────────────────────┐   │
+│  │ useWebSocket         │   │ Zustand Stores                      │   │
+│  │ (exp. backoff        │──▶│ • authStore (JWT, user)             │   │
+│  │  reconnection)       │   │ • sessionStore (CRUD, history)      │   │
+│  └──────────┬───────────┘   │ • recognitionStore (signs, status)  │   │
+│             │               └─────────────────────────────────────┘   │
+│  ┌──────────┴───────────┐   ┌─────────────────────────────────────┐   │
+│  │ REST Client (Axios)  │──▶│ /api/auth/* · /api/sessions/*       │   │
+│  │ + JWT interceptors   │   │ /api/translate · /api/tts            │   │
+│  └──────────┬───────────┘   └─────────────────────────────────────┘   │
+└─────────────┼─────────────────────────────────────────────────────────┘
+              │
+              ▼
 ┌───────────────────────────────────────────────────────────────────┐
 │                     BACKEND (FastAPI :8000)                       │
 │                                                                   │
@@ -152,28 +159,43 @@ sign-language-bridge/
 │   └── Dockerfile
 ├── frontend/                          # React SPA
 │   ├── src/
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   ├── components/
-│   │   │   ├── ui/                        # Button, Card, Badge
-│   │   │   ├── features/
-│   │   │   │   ├── VideoCapture.tsx       # Webcam + landmark overlay
-│   │   │   │   ├── SignDisplay.tsx        # Current sign + confidence
-│   │   │   │   ├── TranscriptPanel.tsx    # Running sentence transcript
-│   │   │   │   ├── LanguageSwitcher.tsx   # EN/ES/FR toggle
-│   │   │   │   └── AudioPlayer.tsx        # TTS playback controls
-│   │   │   └── layouts/
-│   │   │       └── MainLayout.tsx
+│   │   ├── main.tsx                       # App entry point
+│   │   ├── app/
+│   │   │   ├── App.tsx                    # Root component (auth init, toast provider)
+│   │   │   ├── routes.tsx                 # React Router config (protected routes)
+│   │   │   ├── pages/
+│   │   │   │   ├── Landing.tsx            # Public landing page
+│   │   │   │   ├── Auth.tsx               # Login/register with JWT auth
+│   │   │   │   ├── Dashboard.tsx          # Main app: webcam, transcript, sessions
+│   │   │   │   └── Settings.tsx           # User profile, preferences, theme
+│   │   │   └── components/
+│   │   │       ├── ProtectedRoute.tsx     # Auth guard (redirects to /auth)
+│   │   │       ├── ErrorBoundary.tsx      # React error boundary with retry
+│   │   │       ├── figma/                 # Figma-generated helpers
+│   │   │       └── ui/                    # Radix UI primitives (40+ components)
 │   │   ├── lib/
-│   │   │   ├── api/client.ts              # REST + WebSocket client
+│   │   │   ├── api/
+│   │   │   │   ├── client.ts             # Axios instance + JWT interceptors
+│   │   │   │   ├── auth.ts               # register(), login(), getMe()
+│   │   │   │   ├── sessions.ts           # Session CRUD + translation history
+│   │   │   │   └── translate.ts          # translate(), tts(), health()
 │   │   │   ├── hooks/
-│   │   │   │   ├── useWebSocket.ts
-│   │   │   │   └── useCamera.ts
-│   │   │   └── stores/appStore.ts         # Zustand state
-│   │   ├── styles/globals.css
-│   │   └── types/index.ts
+│   │   │   │   ├── useWebSocket.ts       # WS connection + reconnection (exp backoff)
+│   │   │   │   ├── useCamera.ts          # getUserMedia + JPEG frame capture
+│   │   │   │   └── useAudioPlayer.ts     # HTML5 Audio playback controls
+│   │   │   └── stores/
+│   │   │       ├── authStore.ts          # Zustand: user, token, login/logout
+│   │   │       ├── sessionStore.ts       # Zustand: sessions, translations
+│   │   │       └── recognitionStore.ts   # Zustand: WS status, signs, transcript
+│   │   ├── styles/
+│   │   │   ├── index.css                 # CSS entry (fonts, tailwind, theme)
+│   │   │   ├── tailwind.css              # Tailwind v4 imports
+│   │   │   └── theme.css                 # Brand colors + dark mode variables
+│   │   └── types/
+│   │       └── index.ts                  # Full TypeScript types for all features
 │   ├── vite.config.ts
 │   ├── tailwind.config.js
+│   ├── tsconfig.app.json                 # TS strict mode + @/ path alias
 │   └── package.json
 ├── ml/                                # Model training
 │   ├── notebooks/
@@ -445,6 +467,54 @@ Both services are accessed through Amazon Bedrock via `boto3`. All responses are
 
 ---
 
+## Frontend Architecture
+
+The frontend is a production-ready React 18 SPA built with Vite, TypeScript (strict mode), and Tailwind CSS v4. All functionality connects to the FastAPI backend — there is no placeholder logic.
+
+### State Management (Zustand)
+
+| Store | Purpose |
+| --- | --- |
+| `authStore` | JWT token persistence, login/register/logout, user profile updates |
+| `sessionStore` | Session CRUD, active session tracking, translation history loading |
+| `recognitionStore` | WebSocket connection status, current sign, gloss buffer, live transcript |
+
+### Custom Hooks
+
+| Hook | Purpose |
+| --- | --- |
+| `useWebSocket` | Connects to `ws://localhost:8000/ws/recognize` with exponential backoff reconnection (1s → 30s, max 10 attempts). Sends frames, language switches, end-sentence signals. |
+| `useCamera` | Wraps `getUserMedia` for webcam access at 640×480 @ 10fps. Captures JPEG frames at 70% quality, handles permission errors gracefully. |
+| `useAudioPlayer` | HTML5 Audio wrapper with play/pause/seek, progress tracking, volume control, and time formatting for TTS playback. |
+
+### Pages
+
+| Route | Page | Auth Required | Description |
+| --- | --- | --- | --- |
+| `/` | Landing | No | Public hero page with feature cards |
+| `/auth` | Auth | No | Login/register form with JWT flow |
+| `/app` | Dashboard | Yes | Main app: webcam feed, real-time sign recognition, transcript panel, session sidebar, audio player, language switcher |
+| `/settings` | Settings | Yes | Profile editing, preferred language, theme toggle, account deactivation |
+
+### Design System
+
+- **Colors**: Deep Teal (#1F3A44) primary, Accent Gold (#D89A3D), Action Orange (#E2582D)
+- **Fonts**: Space Mono (display), DM Sans (body), JetBrains Mono (code)
+- **Components**: 40+ Radix UI primitives styled with Tailwind
+- **Theme**: Dark mode default, light mode supported via CSS custom properties
+
+### Frontend Scripts
+
+```bash
+cd frontend
+npm run dev           # Start Vite dev server (http://localhost:5173)
+npm run build         # Type-check + production build
+npm run preview       # Preview production build locally
+npm run type-check    # TypeScript type checking only
+```
+
+---
+
 ## Development
 
 ### Run Without Docker
@@ -492,13 +562,16 @@ curl -X POST http://localhost:8000/api/register \
 ## Demo Flow
 
 ```
-1. Open browser → grant camera access
-2. Sign "HELLO" → system displays "HELLO" with 94% confidence
-3. Sign "NAME" → "WHAT" → press End Sentence
-4. System outputs: "Hello, what is your name?"
-5. Switch language to Spanish (ES)
-6. Audio plays: "Hola, ¿cómo te llamas?"
-7. Show cache stats: 79% hit rate
+1. Visit http://localhost:5173 → click "Create Account" → register
+2. Dashboard loads → click "Start Recording" → grant camera access
+3. A new session is created automatically in the sidebar
+4. Sign "HELLO" → current sign overlay shows "HELLO" with 94% confidence
+5. Sign "NAME" → "WHAT" → gloss buffer shows "HELLO → NAME → WHAT"
+6. Click "End Sentence" → transcript card appears: "Hello, what is your name?"
+7. Switch language to Spanish → transcript shows translated text below
+8. Audio player plays the TTS output: "Hola, ¿cómo te llamas?"
+9. Click a past session in the sidebar → full translation history loads
+10. Click "Download Transcript" → formatted .txt file downloads
 ```
 
 ---
