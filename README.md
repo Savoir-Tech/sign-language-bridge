@@ -69,25 +69,25 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         BROWSER (React + Zustand)                     │
-│                                                                       │
+│                         BROWSER (React + Zustand)                    │
+│                                                                      │
 │  ┌──────────────┐  ┌───────────────┐  ┌────────────┐  ┌───────────┐  │
 │  │ Webcam Feed  │  │ Transcript    │  │ Language   │  │ Audio     │  │
 │  │ (useCamera)  │  │ Panel         │  │ Switcher   │  │ Player    │  │
 │  └──────┬───────┘  └───────────────┘  └────────────┘  └───────────┘  │
-│         │  frames (base64 JPEG @ 10fps)                               │
-│         ▼                                                             │
-│  ┌──────────────────────┐   ┌─────────────────────────────────────┐   │
-│  │ useWebSocket         │   │ Zustand Stores                      │   │
-│  │ (exp. backoff        │──▶│ • authStore (JWT, user)             │   │
-│  │  reconnection)       │   │ • sessionStore (CRUD, history)      │   │
-│  └──────────┬───────────┘   │ • recognitionStore (signs, status)  │   │
-│             │               └─────────────────────────────────────┘   │
-│  ┌──────────┴───────────┐   ┌─────────────────────────────────────┐   │
-│  │ REST Client (Axios)  │──▶│ /api/auth/* · /api/sessions/*       │   │
-│  │ + JWT interceptors   │   │ /api/translate · /api/tts            │   │
-│  └──────────┬───────────┘   └─────────────────────────────────────┘   │
-└─────────────┼─────────────────────────────────────────────────────────┘
+│         │  frames (base64 JPEG @ 10fps)                              │
+│         ▼                                                            │
+│  ┌──────────────────────┐   ┌─────────────────────────────────────┐  │
+│  │ useWebSocket         │   │ Zustand Stores                      │  │
+│  │ (exp. backoff        │──▶│ • authStore (JWT, user)            │  │
+│  │  reconnection)       │   │ • sessionStore (CRUD, history)      │  │
+│  └──────────┬───────────┘   │ • recognitionStore (signs, status)  │  │
+│             │               └─────────────────────────────────────┘  │
+│  ┌──────────┴───────────┐   ┌─────────────────────────────────────┐  │
+│  │ REST Client (Axios)  │──▶│ /api/auth/* · /api/sessions/*      │  │
+│  │ + JWT interceptors   │   │ /api/translate · /api/tts           │  │
+│  └──────────┬───────────┘   └─────────────────────────────────────┘  │
+└─────────────┼────────────────────────────────────────────────────────┘
               │
               ▼
 ┌───────────────────────────────────────────────────────────────────┐
@@ -97,8 +97,8 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 │  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text    │   │
 │  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │   │
 │  └───────────────┘    └───────┬───────┘    └────────┬─────────┘   │
-│                               │                      │            │
-│                               ▼                      ▼            │
+│                               │                     │             │
+│                               ▼                     ▼             │
 │                      ┌────────────────┐    ┌──────────────────┐   │
 │                      │  Redis Cache   │    │ Amazon Nova      │   │
 │                      │  :6379         │    │ Micro (Translate)│   │
