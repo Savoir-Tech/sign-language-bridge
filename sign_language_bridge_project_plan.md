@@ -22,7 +22,7 @@ This is a **hackathon project** — every decision prioritizes getting a working
 
 ```
 ┌──────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Webcam     │───▶│  MediaPipe Hands│───▶│  ASL Classifier │
+│   Webcam     │───▶│MediaPipe Holistc│───▶│  ASL Classifier │
 │  (Browser)   │    │  (Landmark       │    │  (Trained on    │
 │              │    │   Extraction)    │    │   ASL Citizen)  │
 └──────────────┘    └──────────────────┘    └────────┬────────┘
@@ -72,7 +72,7 @@ The model training follows this flow:
 1. **Data Preparation**
    - Download ASL Citizen dataset (video clips of isolated signs)
    - Extract frames from each video clip
-   - Run MediaPipe Hands on each frame to extract 21 hand landmarks (x, y, z per landmark = 63 values per hand, 126 for both hands)
+   - Run MediaPipe Holistic on each frame to extract 543 landmarks (pose, hands, face); select 27-node skeleton subset (x, y per node = 54 values)
    - Normalize landmarks relative to wrist position (translation invariance)
    - Pad/truncate sequences to fixed length (e.g., 30 frames)
 
@@ -106,8 +106,8 @@ The model training follows this flow:
    ```
 
 3. **Model Architecture**
-   - Input: Sequence of landmark frames (shape: `[batch, 30, 126]`)
-   - Architecture: LSTM or 1D-CNN for temporal sequence classification
+   - Input: Skeleton graph sequences (shape: `[batch, 2, 128, 27]` — channels, frames, nodes)
+   - Architecture: ST-GCN (Spatial Temporal Graph Convolutional Network)
    - Output: Softmax over sign vocabulary
 
    ```python
@@ -174,7 +174,7 @@ The model training follows this flow:
 5. **Export for Inference**
    ```python
    # Save model weights
-   torch.save(model.state_dict(), "models/asl_classifier.pth")
+   torch.save(model.state_dict(), "models/asl_stgcn.pt")
 
    # Save vocabulary mapping
    import json
@@ -318,7 +318,7 @@ Response: 200 OK
 
 ### Why Redis?
 
-Frequently signed words (HELLO, YES, NO, THANK-YOU) account for ~60-70% of all signs in typical conversation. Caching these avoids running the full LSTM inference pipeline every time.
+Frequently signed words (HELLO, YES, NO, THANK-YOU) account for ~60-70% of all signs in typical conversation. Caching these avoids running the full ST-GCN inference pipeline every time.
 
 ### Cache Architecture
 
@@ -1104,7 +1104,7 @@ JWT_ALGORITHM=HS256
 JWT_EXPIRY_HOURS=24
 
 # Model
-MODEL_PATH=trained_models/asl_classifier.pth
+MODEL_PATH=trained_models/asl_stgcn.pt
 VOCAB_PATH=trained_models/sign_vocab.json
 CONFIDENCE_THRESHOLD=0.75
 
@@ -1171,7 +1171,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     REDIS_URL: str = "redis://localhost:6379"
     AWS_REGION: str = "us-east-1"
-    MODEL_PATH: str = "trained_models/asl_classifier.pth"
+    MODEL_PATH: str = "trained_models/asl_stgcn.pt"
     VOCAB_PATH: str = "trained_models/sign_vocab.json"
     CONFIDENCE_THRESHOLD: float = 0.75
     SIGN_CACHE_TTL: int = 3600
@@ -1577,7 +1577,7 @@ sign-language-bridge/
 │   │   │       ├── tts.py           # POST /api/tts
 │   │   │       └── websocket.py     # WS /ws/recognize
 │   │   ├── services/
-│   │   │   ├── model_service.py     # LSTM model + MediaPipe inference
+│   │   │   ├── model_service.py     # ST-GCN model + MediaPipe Holistic inference
 │   │   │   ├── cache_service.py     # Redis caching layer
 │   │   │   ├── gloss_service.py     # Gloss → natural text conversion
 │   │   │   ├── translation_service.py  # EN → ES/FR translation
@@ -1585,7 +1585,7 @@ sign-language-bridge/
 │   │   └── utils/
 │   │       └── logger.py            # Structured logging
 │   ├── trained_models/
-│   │   ├── asl_classifier.pth       # Trained PyTorch weights
+│   │   ├── asl_stgcn.pt             # Trained ST-GCN weights
 │   │   └── sign_vocab.json          # Sign label → index mapping
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -1663,7 +1663,7 @@ sign-language-bridge/
 │                                                                      │
 │  ┌───────────────┐    ┌───────────────┐    ┌──────────────────┐     │
 │  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text     │     │
-│  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │     │
+│  │ (Holistic)    │    │ (ST-GCN)      │    │ Converter        │     │
 │  └───────────────┘    └───────┬───────┘    └────────┬─────────┘     │
 │                               │                      │               │
 │                               ▼                      ▼               │
@@ -1695,7 +1695,7 @@ sign-language-bridge/
 7. When buffer full:
    a. Hash quantized landmarks → check Redis cache
    b. Cache hit → return cached sign immediately
-   c. Cache miss → run LSTM classifier → get sign + confidence
+   c. Cache miss → run ST-GCN classifier → get sign + confidence
    d. If confidence > 0.75, cache the result (1hr TTL)
 8. Send prediction back to client: {"sign": "HELLO", "confidence": 0.94}
 9. Client displays sign in real-time
@@ -1718,8 +1718,8 @@ sign-language-bridge/
 ### Day 1: Model Training + Infrastructure
 1. **Download ASL Citizen dataset** — run `download_dataset.py`
 2. **Extract landmarks** — preprocess all videos through MediaPipe
-3. **Train LSTM model** — run training notebook, target 80%+ accuracy
-4. **Export model** — save `.pth` weights + `sign_vocab.json`
+3. **Train ST-GCN model** — run training script, target 70%+ accuracy
+4. **Export model** — save `.pt` weights + `sign_vocab.json`
 5. **Docker Compose** — get PostgreSQL + Redis containers running, verify connectivity
 6. **Database schema** — create `sql/init.sql`, verify tables with `\dt`
 
@@ -1758,8 +1758,8 @@ sign-language-bridge/
 | AWS Lambda + API Gateway + DynamoDB | Local Docker + FastAPI + PostgreSQL + Redis |
 | Cognito auth + JWT tokens | JWT auth (pyjwt + passlib/bcrypt) |
 | Three.js 3D avatar for sign output | Text + TTS only (no avatar) |
-| Nova Embeddings for similarity search | Direct LSTM classification |
-| WLASL + I3D on ECS Fargate | ASL Citizen + LSTM on CPU |
+| Nova Embeddings for similarity search | Direct ST-GCN classification |
+| WLASL + I3D on ECS Fargate | ASL Citizen + ST-GCN on CPU |
 | WebSocket via API Gateway | WebSocket via FastAPI native |
 | DynamoDB session management | PostgreSQL (users + sessions + translation history) |
 | No persistent translation history | ChatGPT-like session replay with full gloss/translation logs |

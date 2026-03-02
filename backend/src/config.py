@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     JWT_EXPIRY_HOURS: int = 24
 
     # Model
-    MODEL_PATH: str = "trained_models/asl_classifier.pth"
+    MODEL_PATH: str = "trained_models/asl_stgcn.pt"
     VOCAB_PATH: str = "trained_models/sign_vocab.json"
     CONFIDENCE_THRESHOLD: float = 0.75
 

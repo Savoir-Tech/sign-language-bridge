@@ -8,7 +8,7 @@
 
 > **Real-time ASL interpretation powered by Amazon Nova — breaking communication barriers for 11+ million ASL users**
 
-Sign Language Bridge captures American Sign Language through your webcam, classifies signs using an LSTM model trained on the ASL Citizen dataset, and converts them to text and spoken audio in English, Spanish, or French using Amazon Nova Sonic. Frequently used signs are cached in Redis for instant lookup, and all translation history is persisted in PostgreSQL.
+Sign Language Bridge captures American Sign Language through your webcam, classifies signs using an ST-GCN model trained on the ASL Citizen dataset, and converts them to text and spoken audio in English, Spanish, or French using Amazon Nova Sonic. Frequently used signs are cached in Redis for instant lookup, and all translation history is persisted in PostgreSQL.
 
 ---
 
@@ -20,8 +20,8 @@ Deaf and hard-of-hearing individuals face communication barriers across emergenc
 
 Sign Language Bridge provides **real-time ASL-to-speech translation** in three languages:
 
-1. **Sign to webcam** — MediaPipe extracts hand landmarks from the video feed
-2. **AI classifies** — LSTM model (trained on ASL Citizen dataset) identifies the sign
+1. **Sign to webcam** — MediaPipe Holistic extracts skeleton landmarks from the video feed
+2. **AI classifies** — ST-GCN model (trained on ASL Citizen dataset) identifies the sign
 3. **Redis caches** — Frequent signs are cached for instant lookup (~60-70% hit rate)
 4. **Nova translates** — Amazon Nova Micro translates text to Spanish or French
 5. **Nova speaks** — Amazon Nova Sonic converts text to spoken audio in real-time
@@ -32,8 +32,8 @@ Sign Language Bridge provides **real-time ASL-to-speech translation** in three l
 ## Core Pipeline
 
 ```
-Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
-                  (Landmarks)       (ASL Citizen)      ↓
+Webcam (10fps) → MediaPipe Holistic → ST-GCN Classifier → Redis Cache
+                  (Skeleton)          (ASL Citizen)        ↓
                                                    Gloss → Text
                                                        ↓
                                                   Nova Micro (Translate EN→ES/FR)
@@ -53,8 +53,8 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 | -------------------- | ------------------------------------------- | -------------------------------------------------------- |
 | **Frontend**         | React 18 + TypeScript + Vite + Tailwind v4 + Zustand + Radix UI | Webcam capture, sign display, transcript UI, state management |
 | **Backend**          | Python 3.11 + FastAPI                       | WebSocket server, ML inference, API routes               |
-| **ML Model**         | PyTorch (Bidirectional LSTM)                | Sign classification from landmark sequences              |
-| **Hand Tracking**    | MediaPipe Hands                             | Extract 21 hand landmarks per hand (126 values)          |
+| **ML Model**         | PyTorch (ST-GCN)                            | Skeleton-based sign classification via graph convolution  |
+| **Pose Tracking**    | MediaPipe Holistic                          | Extract 27-node skeleton (pose + hands, x/y coordinates) |
 | **Database**         | PostgreSQL 16                               | Users, sessions, translation history                     |
 | **Cache**            | Redis 7                                     | Frequent sign lookup, translation cache, TTS audio cache |
 | **Auth**             | JWT (PyJWT)                                 | User authentication and session management               |
@@ -95,7 +95,7 @@ Webcam (10fps) → MediaPipe Hands → LSTM Classifier → Redis Cache
 │                                                                   │
 │  ┌───────────────┐    ┌───────────────┐    ┌──────────────────┐   │
 │  │ MediaPipe     │───▶│ ASL Classifier│───▶│ Gloss → Text    │   │
-│  │ (Landmarks)   │    │ (LSTM Model)  │    │ Converter        │   │
+│  │ (Holistic)    │    │ (ST-GCN)      │    │ Converter        │   │
 │  └───────────────┘    └───────┬───────┘    └────────┬─────────┘   │
 │                               │                     │             │
 │                               ▼                     ▼             │
@@ -144,7 +144,7 @@ sign-language-bridge/
 │   │   │       ├── sessions.py            # CRUD /api/sessions
 │   │   │       └── websocket.py           # WS /ws/recognize
 │   │   ├── services/
-│   │   │   ├── model_service.py           # LSTM model + MediaPipe inference
+│   │   │   ├── model_service.py           # ST-GCN model + MediaPipe Holistic inference
 │   │   │   ├── cache_service.py           # Redis caching layer
 │   │   │   ├── gloss_service.py           # Gloss → natural text conversion
 │   │   │   ├── translation_service.py     # Nova Micro EN → ES/FR
@@ -197,22 +197,25 @@ sign-language-bridge/
 │   ├── tailwind.config.js
 │   ├── tsconfig.app.json                 # TS strict mode + @/ path alias
 │   └── package.json
-├── ml/                                # Model training
-│   ├── notebooks/
-│   │   └── train_asl_citizen.ipynb
-│   ├── scripts/
-│   │   ├── asl_dataset.py                 # Dataset loader
-│   │   ├── extract_landmarks.py           # MediaPipe landmark extraction
-│   │   ├── setup_dataset.py               # Dataset download/setup
-│   │   ├── train_asl_lstm.py              # LSTM training script
-│   │   ├── run_full_training.sh           # Full pipeline runner (Linux/Mac)
-│   │   └── run_full_training.bat          # Full pipeline runner (Windows)
+├── ml/                                # Model training (ST-GCN)
+│   ├── config.py                          # Graph topology + hyperparameters
+│   ├── architecture/                      # ST-GCN model definition
+│   │   ├── st_gcn.py                      #   Spatial-temporal graph convolution
+│   │   ├── graph_utils.py                 #   Adjacency matrix construction
+│   │   ├── fc.py                          #   Classification head
+│   │   └── network.py                     #   Encoder-decoder wrapper
+│   ├── extract_poses.py                   # MediaPipe Holistic keypoint extraction
+│   ├── pose_transforms.py                 # Data augmentation (shear, rotation)
+│   ├── dataset.py                         # ASLCitizenDataset (PyTorch)
+│   ├── train.py                           # Training script
+│   ├── test.py                            # Evaluation (top-K, DCG, MRR)
+│   ├── export_model.py                    # Export model for backend
 │   ├── trained_models/                    # Training outputs
 │   │   ├── best_model.pt
 │   │   └── gloss_dict.json
 │   └── data/                              # gitignored
 │       ├── ASL_Citizen/                   # Raw dataset (videos + splits)
-│       └── processed/                     # Extracted landmarks
+│       └── processed/pose_files/          # Extracted .npy pose files
 ├── ASL-citizen-code-main/             # Reference ASL Citizen codebase (I3D, ST-GCN)
 ├── scripts/
 │   ├── demo.sh
@@ -268,7 +271,7 @@ JWT_SECRET=change-this-secret-in-production
 JWT_EXPIRY_HOURS=24
 
 # Model
-MODEL_PATH=trained_models/asl_classifier.pth
+MODEL_PATH=trained_models/asl_stgcn.pt
 VOCAB_PATH=trained_models/sign_vocab.json
 CONFIDENCE_THRESHOLD=0.75
 
@@ -364,35 +367,38 @@ Send base64-encoded JPEG frames, receive sign predictions:
 
 ## Model Training
 
-The LSTM classifier is trained on the **ASL Citizen** dataset — a large-scale, crowdsourced dataset collected by Deaf participants.
+The ST-GCN classifier is trained on the **ASL Citizen** dataset — a large-scale, crowdsourced dataset collected by Deaf participants.
 
 ### Pipeline
 
 ```
-ASL Citizen Videos → Frame Extraction → MediaPipe Hands → Landmark Sequences → LSTM Training
+ASL Citizen Videos → MediaPipe Holistic → 27-Node Skeleton Graph → ST-GCN Training
 ```
 
-1. **Extract landmarks** — MediaPipe extracts 21 hand landmarks per hand (126 values for both hands) from each video frame
-2. **Build sequences** — Pad/truncate to 30-frame sequences per sign
-3. **Train LSTM** — Bidirectional LSTM with dropout → softmax over sign vocabulary
-4. **Export** — Save model weights + gloss dictionary to `ml/trained_models/`
+1. **Extract poses** — MediaPipe Holistic extracts 543 landmarks per frame (pose, hands, face); the pipeline selects a 27-node skeleton subset (pose + both hands)
+2. **Build sequences** — Pad/downsample to 128-frame temporal sequences
+3. **Train ST-GCN** — 10-block spatial-temporal graph convolution network → FC head → softmax over sign vocabulary
+4. **Export** — Save model weights + gloss dictionary, then copy to backend
 
 ```bash
-# Run training (full pipeline)
 cd ml
-./scripts/run_full_training.sh        # Linux/Mac
-scripts\run_full_training.bat          # Windows
 
-# Or run steps individually
-python scripts/setup_dataset.py
-python scripts/extract_landmarks.py
-python scripts/train_asl_lstm.py
+# Step 1: Extract MediaPipe Holistic keypoints from videos
+python extract_poses.py --split train
+python extract_poses.py --split val
+python extract_poses.py --split test
 
-# Or use the notebook
-jupyter notebook notebooks/train_asl_citizen.ipynb
+# Step 2: Train ST-GCN
+python train.py
+
+# Step 3: Evaluate
+python test.py --checkpoint trained_models/best_model.pt
+
+# Step 4: Export to backend
+python export_model.py --checkpoint trained_models/best_model.pt
 ```
 
-See [docs/TRAINING_GUIDE.md](docs/TRAINING_GUIDE.md) and [docs/ASL_CITIZEN_SETUP.md](docs/ASL_CITIZEN_SETUP.md) for detailed instructions.
+See [ml/README.md](ml/README.md) for detailed instructions.
 
 ### Target Vocabulary (MVP)
 
@@ -412,7 +418,7 @@ Redis caches three things to minimize latency and API costs:
 
 | Cache Type       | Key Pattern               | TTL      | Purpose                                |
 | ---------------- | ------------------------- | -------- | -------------------------------------- |
-| Sign predictions | `sign:<landmark_hash>`    | 1 hour   | Skip LSTM inference for repeated signs |
+| Sign predictions | `sign:<landmark_hash>`    | 1 hour   | Skip ST-GCN inference for repeated signs |
 | Translations     | `translation:<text_hash>` | 24 hours | Skip Nova Micro API call               |
 | TTS audio        | `tts:<text_lang_hash>`    | 24 hours | Skip Nova Sonic API call               |
 
@@ -581,7 +587,8 @@ curl -X POST http://localhost:8000/api/register \
 - **Amazon Nova Team** — Nova Micro (translation) + Nova Sonic (TTS)
 - **ASL Citizen Dataset** — Large-scale crowdsourced ASL data from Deaf community members
 - **MediaPipe** — Real-time hand landmark detection
-- **PyTorch** — LSTM model training and inference
+- **PyTorch** — ST-GCN model training and inference
+- **OpenHands** — ST-GCN architecture reference implementation
 
 ---
 

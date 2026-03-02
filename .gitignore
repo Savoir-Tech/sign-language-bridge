@@ -355,12 +355,14 @@ ml/data/ASL_Citizen/
 ml/data/processed/
 ml/trained_models/
 ml/logs/
+ml/results/
 
 # PyTorch model weights (binary, too large for git)
 *.pth
 *.pt
 
 # Trained model artifacts
+backend/trained_models/*.pt
 backend/trained_models/*.pth
 
 #Extras
@@ -369,3 +371,7 @@ ASL-citizen-code-main
 SETUP_VENV.md
 ASL_CITIZEN_SETUP.md
 TRAINING_GUIDE.md
+run_training.bat
+run_training.sh
+setup_venv.bat
+setup_venv.sh

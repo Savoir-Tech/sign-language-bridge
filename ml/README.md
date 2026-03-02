@@ -1,219 +1,160 @@
-# ML Pipeline - ASL Citizen Two-Phase LSTM Training
+# Sign Language Bridge — ML (ST-GCN)
 
-Two-phase transfer learning pipeline for ASL sign language recognition using MediaPipe hand landmarks and a bidirectional LSTM classifier, trained on the [ASL Citizen](https://huggingface.co/datasets/asl-citizen/aslcitizen) dataset (83K+ videos, 2,748 sign classes).
+ASL sign recognition using **Spatial Temporal Graph Convolutional Networks (ST-GCN)** with **MediaPipe Holistic** (`mp.solutions.holistic`) pose extraction, trained on the [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) dataset.
+
+**Requires Python 3.10** — MediaPipe `mp.solutions.holistic` is only available in older MediaPipe releases that target Python 3.10.
+
+## Architecture
+
+The model uses a 27-node skeleton graph built from MediaPipe Holistic landmarks:
+
+- **7 pose keypoints** — nose, eyes, shoulders, elbows
+- **10 left hand keypoints** — wrist, fingertips, MCPs
+- **10 right hand keypoints** — same as left hand
+
+The ST-GCN backbone (10 blocks, output dimension 256) is followed by a fully-connected classification head. Input tensors are `(batch, 2, 128, 27)` — 2 channels (x, y), 128 frames, 27 graph nodes.
+
+The architecture is sourced from [OpenHands](https://github.com/AI4Bharat/OpenHands) and adapted for the ASL Citizen dataset.
 
 ## Directory Structure
 
 ```
 ml/
+├── config.py                  # Graph topology, keypoint selection, hyperparameters
+├── architecture/              # ST-GCN model definition
+│   ├── st_gcn.py              #   Spatial-temporal graph convolution blocks
+│   ├── graph_utils.py         #   Adjacency matrix construction
+│   ├── fc.py                  #   Fully-connected classification head
+│   └── network.py             #   Encoder-decoder wrapper
+├── extract_poses.py           # MediaPipe Holistic keypoint extraction
+├── pose_transforms.py         # Data augmentation (shear, rotation)
+├── dataset.py                 # ASLCitizenDataset (PyTorch)
+├── train.py                   # Training script
+├── test.py                    # Evaluation script (top-K accuracy, DCG, MRR)
+├── export_model.py            # Export model for backend deployment
+├── requirements.txt           # Pinned dependencies (Python 3.10)
+├── setup_venv.bat             # Creates Python 3.10 venv and installs deps
+├── run_training.bat           # Automates the full pipeline
 ├── data/
-│   ├── ASL_Citizen/
-│   │   ├── splits/                  # Official train/val/test CSV splits
-│   │   └── videos/                  # Raw MP4 videos (~83K files)
-│   ├── data_csv/                    # Processed CSVs with pose mappings
-│   │   ├── train.csv                # 40,154 training samples
-│   │   ├── val.csv                  # 10,304 validation samples
-│   │   ├── test.csv                 # 32,941 test samples
-│   │   ├── pose_map_train.csv       # Video-to-pose file mappings
-│   │   ├── pose_map_val.csv
-│   │   └── pose_map_test.csv
-│   ├── processed/
-│   │   └── pose_per_files/          # Extracted hand landmark .npy files (~83K)
-│   └── sign_vocab.json              # Vocabulary: 2,748 sign classes
-├── notebooks/
-│   └── train_asl_citizen.ipynb      # Training notebook (alternative)
-├── scripts/
-│   ├── setup_dataset.py             # Step 1: Setup directories and copy splits
-│   ├── extract_landmarks.py         # Steps 2-4: Extract hand landmarks from videos
-│   ├── asl_dataset.py               # PyTorch dataset loader (shared)
-│   ├── train_phase1.py              # Step 5: Train on top-N frequent classes
-│   ├── train_phase2.py              # Step 6: Fine-tune on all classes
-│   ├── run_full_training.bat        # One-click full pipeline (Windows)
-│   └── run_full_training.sh         # One-click full pipeline (Linux/Mac)
-├── trained_models/
-│   ├── phase1/                      # Phase 1 checkpoints (generated)
-│   └── phase2/                      # Phase 2 checkpoints (generated)
-├── logs/                            # Training logs (generated)
-├── requirements.txt
-├── setup_venv.bat
-└── README.md
+│   ├── data_csv/              # Split CSVs and pose map files
+│   ├── ASL_Citizen/videos/    # Raw video files (user-provided)
+│   └── processed/pose_files/  # Extracted .npy pose files
+├── trained_models/            # Saved checkpoints and gloss dict
+├── results/                   # Test evaluation output
+└── logs/                      # Per-epoch training logs
 ```
 
-## Training Strategy
+## Setup
 
-With 2,748 classes and only ~14 samples per class on average, training directly on the full dataset leads to overfitting. The two-phase approach solves this:
+### 1. Install Python 3.10
 
-**Phase 1** — Train on the top-N most frequent classes (~150) where there's enough data per class to learn strong LSTM representations.
+Download Python 3.10 from [python.org](https://www.python.org/downloads/release/python-31011/) and ensure `py -3.10` works from the command line.
 
-**Phase 2** — Transfer those learned representations to all 2,748 classes using gradual unfreezing:
-- Stage A: Freeze LSTM + fc1, train only the new fc2 head
-- Stage B: Unfreeze fc1, keep LSTM frozen
-- Stage C: Unfreeze everything, fine-tune end-to-end with low LR
-
-## Pipeline
-
-### Step 1: Setup Dataset
+### 2. Create Virtual Environment
 
 ```bash
-cd ml/scripts
-python setup_dataset.py
+# Windows — creates a Python 3.10 venv automatically
+setup_venv.bat
+
+# Linux / macOS
+python3.10 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Copies official ASL Citizen split CSVs into `data/data_csv/` and creates output directories.
+### 3. Prepare Data
 
-### Steps 2-4: Extract Hand Landmarks
+Download the ASL Citizen dataset from [Microsoft Research](https://www.microsoft.com/en-us/research/project/asl-citizen/) and place videos in `data/ASL_Citizen/videos/`. Place the split CSVs (`train.csv`, `val.csv`, `test.csv`) in `data/data_csv/`.
+
+### 4. Extract Poses
+
+Extract MediaPipe Holistic keypoints from all videos. Each video produces a `.npy` array of shape `(num_frames, 543, 2)` — matching the reference ST-GCN pipeline exactly.
 
 ```bash
-python extract_landmarks.py --split train
-python extract_landmarks.py --split val
-python extract_landmarks.py --split test
+python extract_poses.py --split train
+python extract_poses.py --split val
+python extract_poses.py --split test
 ```
 
-Processes each video with MediaPipe Hands and saves a `.npy` file per video:
-- **42 keypoints** (21 per hand) x **3 coordinates** (x, y, z) = **126 features** per frame
-- Output: `data/processed/pose_per_files/<video_id>.npy`
-- Estimated time: ~10-20 hours for train, ~3-5 hours for val, ~8-15 hours for test
+Use `--num-videos N` for testing with a subset.
 
-### Step 5: Phase 1 — Top-N Class Training
+### 5. Train
 
 ```bash
-python train_phase1.py \
-    --top-n 150 \
-    --epochs 100 \
-    --batch-size 32 \
-    --hidden-size 256 \
-    --num-layers 2 \
-    --dropout 0.3 \
-    --lr 3e-4 \
-    --max-frames 30
+python train.py
 ```
 
-Filters the dataset to the 150 most frequent classes, trains from scratch, and saves the best checkpoint to `ml/trained_models/phase1/phase1_best.pt`.
+Key arguments:
 
-### Step 6: Phase 2 — Full Fine-Tuning
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--epochs` | 100 | Maximum training epochs |
+| `--batch-size` | 32 | Batch size |
+| `--lr` | 1e-3 | Learning rate |
+| `--max-frames` | 128 | Temporal sequence length |
+| `--device` | auto | `cuda` or `cpu` |
+
+Training saves checkpoints to `trained_models/` and logs to `logs/`.
+
+### 6. Evaluate
 
 ```bash
-python train_phase2.py \
-    --phase1-checkpoint ../trained_models/phase1/phase1_best.pt \
-    --epochs-stage-a 10 \
-    --epochs-stage-b 10 \
-    --epochs-stage-c 80 \
-    --lr-stage-a 1e-3 \
-    --lr-stage-b 3e-4 \
-    --lr-stage-c 5e-5
+python test.py --checkpoint trained_models/best_model.pt
 ```
 
-Loads Phase 1 weights, replaces fc2 for 2,748 classes, and trains in three stages with gradual unfreezing. Best model saved to `ml/trained_models/phase2/phase2_best.pt`.
+Outputs top-1/5/10/20 accuracy, DCG, MRR, confusion matrices, and per-user statistics to `results/`.
 
-### One-Click Full Pipeline
+### 7. Export for Backend
 
 ```bash
-# Windows
-run_full_training.bat
-
-# Linux/Mac
-bash run_full_training.sh
+python export_model.py --checkpoint trained_models/best_model.pt
 ```
 
-Runs all six steps sequentially.
+This copies the model weights and vocabulary to `backend/trained_models/` where the API server can load them at startup.
 
-## Model Architecture
+### Automated Pipeline
 
-```
-ASLLSTMClassifier
-├── Bidirectional LSTM (2 layers)
-│   ├── input_size:  126  (42 hand keypoints x 3 coords)
-│   ├── hidden_size: 256
-│   └── dropout:     0.3
-├── FC1: Linear(512 -> 256) + ReLU + Dropout(0.3)
-└── FC2: Linear(256 -> num_classes)
-```
+Run the entire pipeline (extract, train, evaluate) with a single command:
 
-| Detail       | Value                          |
-|--------------|--------------------------------|
-| Input shape  | `(batch, 30, 126)`             |
-| Output shape | `(batch, num_classes)`         |
-| Optimizer    | Adam (weight_decay=1e-4)       |
-| Scheduler    | CosineAnnealingLR              |
-| Loss         | CrossEntropyLoss               |
-| Early stop   | Patience = 10 epochs           |
-
-## Dataset Stats
-
-| Split        | Samples    |
-|--------------|------------|
-| Train        | 40,154     |
-| Validation   | 10,304     |
-| Test         | 32,941     |
-| **Total**    | **83,399** |
-| **Classes**  | **2,748**  |
-
-## CLI Arguments
-
-### train_phase1.py
-
-| Argument              | Default  | Description                          |
-|-----------------------|----------|--------------------------------------|
-| `--top-n`             | `150`    | Number of most frequent classes      |
-| `--max-frames`        | `30`     | Max frames sampled per video         |
-| `--batch-size`        | `32`     | Training batch size                  |
-| `--num-workers`       | `4`      | Data loading workers                 |
-| `--hidden-size`       | `256`    | LSTM hidden units                    |
-| `--num-layers`        | `2`      | Number of LSTM layers                |
-| `--dropout`           | `0.3`    | Dropout rate                         |
-| `--epochs`            | `100`    | Training epochs                      |
-| `--lr`                | `3e-4`   | Learning rate                        |
-| `--scheduler-t-max`   | `10`     | Cosine annealing T_max               |
-| `--save-every`        | `5`      | Save checkpoint every N epochs       |
-
-### train_phase2.py
-
-| Argument                  | Default  | Description                          |
-|---------------------------|----------|--------------------------------------|
-| `--phase1-checkpoint`     | required | Path to Phase 1 `.pt` file           |
-| `--max-frames`            | `30`     | Max frames sampled per video         |
-| `--batch-size`            | `32`     | Training batch size                  |
-| `--num-workers`           | `4`      | Data loading workers                 |
-| `--epochs-stage-a`        | `10`     | Epochs for Stage A (fc2 only)        |
-| `--epochs-stage-b`        | `10`     | Epochs for Stage B (fc1 + fc2)       |
-| `--epochs-stage-c`        | `80`     | Epochs for Stage C (full model)      |
-| `--lr-stage-a`            | `1e-3`   | LR for Stage A                       |
-| `--lr-stage-b`            | `3e-4`   | LR for Stage B                       |
-| `--lr-stage-c`            | `5e-5`   | LR for Stage C                       |
-| `--save-every`            | `5`      | Save checkpoint every N epochs       |
-
-## Outputs
-
-```
-trained_models/
-├── phase1/
-│   ├── phase1_best.pt                      # Best Phase 1 model
-│   ├── phase1_epoch_005_acc_X.XXXX.pt      # Periodic checkpoints
-│   ├── gloss_dict_phase1.json              # Phase 1 class mapping
-│   ├── filtered_train.csv                  # Filtered training CSV
-│   └── filtered_val.csv                    # Filtered validation CSV
-└── phase2/
-    ├── phase2_best.pt                      # Best Phase 2 model (deploy this)
-    ├── phase2_stageA_epoch_XXX_acc_X.pt    # Stage A checkpoints
-    ├── phase2_stageB_epoch_XXX_acc_X.pt    # Stage B checkpoints
-    ├── phase2_stageC_epoch_XXX_acc_X.pt    # Stage C checkpoints
-    └── gloss_dict_full.json                # Full 2,748-class mapping
-```
-
-To deploy, copy to the backend:
 ```bash
-cp ml/trained_models/phase2/phase2_best.pt backend/trained_models/asl_classifier.pth
-cp ml/trained_models/phase2/gloss_dict_full.json backend/trained_models/sign_vocab.json
+run_training.bat
 ```
 
-## Troubleshooting
+## Data Flow
 
-**MediaPipe import error** — Newer versions changed the API. Pin `mediapipe==0.10.32` or use the version in `requirements.txt`.
+```
+Raw MP4 videos
+    │  extract_poses.py (mp.solutions.holistic)
+    ▼
+.npy files (num_frames, 543, 2)
+    │  dataset.py (ASLCitizenDataset)
+    │  - Downsample/pad to 128 frames
+    │  - Normalize by shoulder distance
+    │  - Select 27 keypoints, reorder to [pose, LH, RH]
+    │  - Transpose to (C, T, V) = (2, 128, 27)
+    ▼
+ST-GCN backbone → 256-dim embedding → FC head → class logits
+```
 
-**Out of memory** — Reduce `--batch-size` to 16 or 8, or reduce `--hidden-size` to 128.
+## Real-Time Inference (Backend)
 
-**Slow landmark extraction** — This is CPU-bound. Process splits individually with `--split` and run overnight.
+The backend (`backend/src/services/model_service.py`) performs the same pipeline in real-time:
 
-**Phase 1 accuracy too low** — Try reducing `--top-n` (e.g., 100 or 50) to give more samples per class. Aim for 60-70%+ before moving to Phase 2.
+1. Webcam frames arrive via WebSocket as base64 JPEG
+2. `mp.solutions.holistic` extracts landmarks per frame
+3. A 128-frame sliding window buffers the landmarks
+4. The ST-GCN model predicts the sign
+5. The prediction is sent back to the frontend
 
-**Phase 2 diverges** — Lower `--lr-stage-c` further (e.g., `1e-5`). The LSTM weights from Phase 1 should mostly be preserved.
+See `backend/` for the API server implementation.
+
+## Dependency Versions
+
+All dependencies are pinned to versions known to work with Python 3.10 and the `mp.solutions.holistic` API:
+
+- `mediapipe==0.10.5` — last stable release with `mp.solutions.holistic`
+- `torch==2.0.1` — PyTorch with CUDA 11.x support
+- `numpy==1.24.3` — compatible with both PyTorch and MediaPipe
+- `opencv-python==4.8.0.76`
+
+See `requirements.txt` for the full list.

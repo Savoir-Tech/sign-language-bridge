@@ -35,6 +35,6 @@ async def health_check():
         "checks": checks,
         "model_info": {
             "vocabulary_size": len(model_service.vocab) if model_service.vocab else 0,
-            "model_version": "v1.0",
+            "model_version": "v2.0-stgcn",
         },
     }
