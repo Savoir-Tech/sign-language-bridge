@@ -362,7 +362,7 @@ ml/results/
 *.pt
 
 # Trained model artifacts
-backend/trained_models/*.pt
+#backend/trained_models/*.pt
 backend/trained_models/*.pth
 
 #Extras
@@ -375,3 +375,4 @@ run_training.bat
 run_training.sh
 setup_venv.bat
 setup_venv.sh
+.vscode

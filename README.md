@@ -49,19 +49,19 @@ Webcam (10fps) → MediaPipe Holistic → ST-GCN Classifier → Redis Cache
 
 ## Tech Stack
 
-| Layer                | Technology                                  | Purpose                                                  |
-| -------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| Layer                | Technology                                                      | Purpose                                                       |
+| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
 | **Frontend**         | React 18 + TypeScript + Vite + Tailwind v4 + Zustand + Radix UI | Webcam capture, sign display, transcript UI, state management |
-| **Backend**          | Python 3.11 + FastAPI                       | WebSocket server, ML inference, API routes               |
-| **ML Model**         | PyTorch (ST-GCN)                            | Skeleton-based sign classification via graph convolution  |
-| **Pose Tracking**    | MediaPipe Holistic                          | Extract 27-node skeleton (pose + hands, x/y coordinates) |
-| **Database**         | PostgreSQL 16                               | Users, sessions, translation history                     |
-| **Cache**            | Redis 7                                     | Frequent sign lookup, translation cache, TTS audio cache |
-| **Auth**             | JWT (PyJWT)                                 | User authentication and session management               |
-| **Translation**      | Amazon Nova Micro (Bedrock)                 | EN → ES/FR text translation                              |
-| **Text-to-Speech**   | Amazon Nova Sonic (Bedrock)                 | Multilingual speech synthesis                            |
-| **Training Data**    | ASL Citizen Dataset                         | Large-scale crowdsourced ASL videos from Deaf signers    |
-| **Containerization** | Docker Compose                              | Single-command local deployment                          |
+| **Backend**          | Python 3.11 + FastAPI                                           | WebSocket server, ML inference, API routes                    |
+| **ML Model**         | PyTorch (ST-GCN)                                                | Skeleton-based sign classification via graph convolution      |
+| **Pose Tracking**    | MediaPipe Holistic                                              | Extract 27-node skeleton (pose + hands, x/y coordinates)      |
+| **Database**         | PostgreSQL 16                                                   | Users, sessions, translation history                          |
+| **Cache**            | Redis 7                                                         | Frequent sign lookup, translation cache, TTS audio cache      |
+| **Auth**             | JWT (PyJWT)                                                     | User authentication and session management                    |
+| **Translation**      | Amazon Nova Micro (Bedrock)                                     | EN → ES/FR text translation                                   |
+| **Text-to-Speech**   | Amazon Nova Sonic (Bedrock)                                     | Multilingual speech synthesis                                 |
+| **Training Data**    | ASL Citizen Dataset                                             | Large-scale crowdsourced ASL videos from Deaf signers         |
+| **Containerization** | Docker Compose                                                  | Single-command local deployment                               |
 
 ---
 
@@ -227,229 +227,33 @@ sign-language-bridge/
     └── TRAINING_GUIDE.md
 ```
 
----
-
-## Quick Start
-
-### Prerequisites
-
-- Docker Desktop (4GB+ RAM allocated)
-- Python 3.11+
-- Node.js 20 LTS
-- AWS CLI configured with Bedrock access (`aws configure`)
-- Git
-
-### 1. Clone and Setup
-
-```bash
-git clone https://github.com/yourusername/sign-language-bridge.git
-cd sign-language-bridge
-```
-
-### 2. Environment Variables
-
-Create `.env` in the project root:
-
-```bash
-# Backend
-BACKEND_PORT=8000
-ENVIRONMENT=development
-
-# PostgreSQL
-DATABASE_URL=postgresql://admin:password@postgres:5432/signbridge
-
-# Redis
-REDIS_URL=redis://redis:6379
-
-# AWS (for Nova Micro + Nova Sonic)
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-
-# Auth (JWT)
-JWT_SECRET=change-this-secret-in-production
-JWT_EXPIRY_HOURS=24
-
-# Model
-MODEL_PATH=trained_models/asl_stgcn.pt
-VOCAB_PATH=trained_models/sign_vocab.json
-CONFIDENCE_THRESHOLD=0.75
-
-# Cache TTLs (seconds)
-SIGN_CACHE_TTL=3600
-TRANSLATION_CACHE_TTL=86400
-TTS_CACHE_TTL=86400
-
-# Translation
-DEFAULT_LANGUAGE=en
-SUPPORTED_LANGUAGES=en,es,fr
-```
-
-### 3. Start with Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-This boots four services:
-
-- **backend** — FastAPI on `http://localhost:8000`
-- **frontend** — React on `http://localhost:5173`
-- **postgres** — PostgreSQL on `localhost:5432` (auto-initializes schema from `sql/init.sql`)
-- **redis** — Cache on `localhost:6379`
-
-### 4. Verify
-
-```bash
-# Health check
-curl http://localhost:8000/api/health | jq .
-
-# PostgreSQL
-docker exec -it sign-language-bridge-postgres-1 psql -U admin -d signbridge -c '\dt'
-
-# Redis
-docker exec -it sign-language-bridge-redis-1 redis-cli PING
-```
-
-Visit `http://localhost:5173` — grant camera access and start signing.
-
----
-
-## API Endpoints
-
-### WebSocket (Real-Time Recognition)
-
-```
-WS /ws/recognize
-```
-
-Send base64-encoded JPEG frames, receive sign predictions:
-
-```json
-// Client → Server
-{ "type": "frame", "data": "<base64_jpeg>", "timestamp": 1708070400000 }
-
-// Server → Client
-{ "type": "prediction", "sign": "HELLO", "confidence": 0.94, "cached": true }
-
-// Client → Server (end a sentence)
-{ "type": "end_sentence" }
-
-// Server → Client (full sentence with translation + audio)
-{
-  "type": "sentence",
-  "signs": ["HELLO", "NAME", "WHAT"],
-  "text": "Hello, what is your name?",
-  "translated": "Hola, ¿cómo te llamas?",
-  "language": "es",
-  "audio_url": "/api/tts/audio/abc123.wav"
-}
-```
-
 ### REST
 
-| Method   | Endpoint           | Description                                |
-| -------- | ------------------ | ------------------------------------------ |
-| `GET`    | `/api/health`      | Service health (Postgres + Redis + model)  |
-| `GET`    | `/api/signs`       | List supported sign vocabulary             |
-| `POST`   | `/api/translate`   | Translate text (EN → ES/FR via Nova Micro) |
-| `POST`   | `/api/tts`         | Text-to-speech (via Nova Sonic)            |
-| `POST`   | `/api/register`    | Register a new user                        |
-| `POST`   | `/api/login`       | Login and receive JWT token                |
-| `GET`    | `/api/me`          | Get current user profile (auth required)   |
-| `PUT`    | `/api/me`          | Update user profile (auth required)        |
-| `POST`   | `/api/sessions`    | Create a translation session               |
-| `GET`    | `/api/sessions`    | List user sessions                         |
-| `GET`    | `/api/sessions/:id`| Get session with translation history       |
-| `GET`    | `/api/cache/stats` | Redis cache hit/miss statistics            |
-
----
-
-## Model Training
-
-The ST-GCN classifier is trained on the **ASL Citizen** dataset — a large-scale, crowdsourced dataset collected by Deaf participants.
-
-### Pipeline
-
-```
-ASL Citizen Videos → MediaPipe Holistic → 27-Node Skeleton Graph → ST-GCN Training
-```
-
-1. **Extract poses** — MediaPipe Holistic extracts 543 landmarks per frame (pose, hands, face); the pipeline selects a 27-node skeleton subset (pose + both hands)
-2. **Build sequences** — Pad/downsample to 128-frame temporal sequences
-3. **Train ST-GCN** — 10-block spatial-temporal graph convolution network → FC head → softmax over sign vocabulary
-4. **Export** — Save model weights + gloss dictionary, then copy to backend
-
-```bash
-cd ml
-
-# Step 1: Extract MediaPipe Holistic keypoints from videos
-python extract_poses.py --split train
-python extract_poses.py --split val
-python extract_poses.py --split test
-
-# Step 2: Train ST-GCN
-python train.py
-
-# Step 3: Evaluate
-python test.py --checkpoint trained_models/best_model.pt
-
-# Step 4: Export to backend
-python export_model.py --checkpoint trained_models/best_model.pt
-```
-
-See [ml/README.md](ml/README.md) for detailed instructions.
-
-### Target Vocabulary (MVP)
-
-50-100 most common signs prioritized for practical use:
-
-- **Greetings**: HELLO, GOODBYE, THANK-YOU, PLEASE, SORRY
-- **Questions**: WHAT, WHERE, WHEN, WHO, HOW, WHY
-- **Common**: YES, NO, HELP, WANT, NEED, NAME, UNDERSTAND
-- **Emergency**: EMERGENCY, PAIN, DOCTOR, HOSPITAL, CALL
-- **Fingerspelling**: A-Z (26 static hand shapes)
-
----
+| Method | Endpoint            | Description                                |
+| ------ | ------------------- | ------------------------------------------ |
+| `GET`  | `/api/health`       | Service health (Postgres + Redis + model)  |
+| `GET`  | `/api/signs`        | List supported sign vocabulary             |
+| `POST` | `/api/translate`    | Translate text (EN → ES/FR via Nova Micro) |
+| `POST` | `/api/tts`          | Text-to-speech (via Nova Sonic)            |
+| `POST` | `/api/register`     | Register a new user                        |
+| `POST` | `/api/login`        | Login and receive JWT token                |
+| `GET`  | `/api/me`           | Get current user profile (auth required)   |
+| `PUT`  | `/api/me`           | Update user profile (auth required)        |
+| `POST` | `/api/sessions`     | Create a translation session               |
+| `GET`  | `/api/sessions`     | List user sessions                         |
+| `GET`  | `/api/sessions/:id` | Get session with translation history       |
+| `GET`  | `/api/cache/stats`  | Redis cache hit/miss statistics            |
 
 ## Caching Strategy
 
 Redis caches three things to minimize latency and API costs:
 
-| Cache Type       | Key Pattern               | TTL      | Purpose                                |
-| ---------------- | ------------------------- | -------- | -------------------------------------- |
+| Cache Type       | Key Pattern               | TTL      | Purpose                                  |
+| ---------------- | ------------------------- | -------- | ---------------------------------------- |
 | Sign predictions | `sign:<landmark_hash>`    | 1 hour   | Skip ST-GCN inference for repeated signs |
-| Translations     | `translation:<text_hash>` | 24 hours | Skip Nova Micro API call               |
-| TTS audio        | `tts:<text_lang_hash>`    | 24 hours | Skip Nova Sonic API call               |
+| Translations     | `translation:<text_hash>` | 24 hours | Skip Nova Micro API call                 |
+| TTS audio        | `tts:<text_lang_hash>`    | 24 hours | Skip Nova Sonic API call                 |
 
-Frequent signs (HELLO, YES, NO, THANK-YOU) account for ~60-70% of all signing — caching these makes a major difference in response time.
-
-```bash
-# Monitor cache performance
-curl http://localhost:8000/api/cache/stats
-# → { "hits": 1542, "misses": 389, "hit_rate": 0.7986 }
-
-# Inspect Redis directly
-docker exec -it sign-language-bridge-redis-1 redis-cli
-> KEYS sign:*
-> GET stats:cache_hits
-```
-
----
-
-## Database Schema
-
-PostgreSQL stores user accounts, sessions, and translation history:
-
-| Table          | Purpose                                         |
-| -------------- | ----------------------------------------------- |
-| `users`        | User accounts (email, password hash, preferences) |
-| `sessions`     | Translation sessions per user                   |
-| `translations` | Individual translations with gloss sequences    |
-
-Schema is auto-initialized via `sql/init.sql` when the Postgres container starts.
-
----
 
 ## Amazon Nova Integration
 
@@ -471,37 +275,6 @@ Converts the final translated text into spoken audio. Supports English, Spanish,
 
 Both services are accessed through Amazon Bedrock via `boto3`. All responses are cached in Redis to avoid repeated API calls for the same text.
 
----
-
-## Frontend Architecture
-
-The frontend is a production-ready React 18 SPA built with Vite, TypeScript (strict mode), and Tailwind CSS v4. All functionality connects to the FastAPI backend — there is no placeholder logic.
-
-### State Management (Zustand)
-
-| Store | Purpose |
-| --- | --- |
-| `authStore` | JWT token persistence, login/register/logout, user profile updates |
-| `sessionStore` | Session CRUD, active session tracking, translation history loading |
-| `recognitionStore` | WebSocket connection status, current sign, gloss buffer, live transcript |
-
-### Custom Hooks
-
-| Hook | Purpose |
-| --- | --- |
-| `useWebSocket` | Connects to `ws://localhost:8000/ws/recognize` with exponential backoff reconnection (1s → 30s, max 10 attempts). Sends frames, language switches, end-sentence signals. |
-| `useCamera` | Wraps `getUserMedia` for webcam access at 640×480 @ 10fps. Captures JPEG frames at 70% quality, handles permission errors gracefully. |
-| `useAudioPlayer` | HTML5 Audio wrapper with play/pause/seek, progress tracking, volume control, and time formatting for TTS playback. |
-
-### Pages
-
-| Route | Page | Auth Required | Description |
-| --- | --- | --- | --- |
-| `/` | Landing | No | Public hero page with feature cards |
-| `/auth` | Auth | No | Login/register form with JWT flow |
-| `/app` | Dashboard | Yes | Main app: webcam feed, real-time sign recognition, transcript panel, session sidebar, audio player, language switcher |
-| `/settings` | Settings | Yes | Profile editing, preferred language, theme toggle, account deactivation |
-
 ### Design System
 
 - **Colors**: Deep Teal (#1F3A44) primary, Accent Gold (#D89A3D), Action Orange (#E2582D)
@@ -517,52 +290,6 @@ npm run dev           # Start Vite dev server (http://localhost:5173)
 npm run build         # Type-check + production build
 npm run preview       # Preview production build locally
 npm run type-check    # TypeScript type checking only
-```
-
----
-
-## Development
-
-### Run Without Docker
-
-```bash
-# Terminal 1: PostgreSQL + Redis
-docker run -d -p 5432:5432 -e POSTGRES_DB=signbridge -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password postgres:16-alpine
-docker run -d -p 6379:6379 redis:7-alpine
-
-# Initialize database schema
-psql -h localhost -U admin -d signbridge -f sql/init.sql
-
-# Terminal 2: Backend
-cd backend
-source venv/bin/activate
-uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Terminal 3: Frontend
-cd frontend
-npm run dev
-```
-
-### Test the Pipeline
-
-```bash
-# WebSocket test
-npx wscat -c ws://localhost:8000/ws/recognize
-
-# Translation test
-curl -X POST http://localhost:8000/api/translate \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hello, I need help", "source": "en", "target": "es"}'
-
-# TTS test
-curl -X POST http://localhost:8000/api/tts \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hello", "language": "en"}'
-
-# Register a user
-curl -X POST http://localhost:8000/api/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "secret", "display_name": "Test User"}'
 ```
 
 ## Demo Flow
@@ -595,13 +322,3 @@ curl -X POST http://localhost:8000/api/register \
 ## License
 
 This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-**Built for accessibility**
-
-[Report Bug](https://github.com/yourusername/sign-language-bridge/issues) | [Request Feature](https://github.com/yourusername/sign-language-bridge/issues)
-
-</div>

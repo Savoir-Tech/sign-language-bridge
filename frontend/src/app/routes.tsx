@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 
@@ -12,6 +13,10 @@ export const router = createBrowserRouter([
   {
     path: "/auth",
     Component: Auth,
+  },
+  {
+    path: "/login",
+    Component: Login,
   },
   {
     path: "/app",

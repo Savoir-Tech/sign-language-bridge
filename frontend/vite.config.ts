@@ -27,6 +27,18 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:8000',
         ws: true,
+        configure: (proxy) => {
+          const originalEmit = proxy.emit.bind(proxy);
+          proxy.emit = (event: string, ...args: unknown[]) => {
+            if (event === 'error') {
+              const err = args[0] as NodeJS.ErrnoException | undefined;
+              if (err?.code === 'ECONNRESET' || err?.message === 'socket hang up') {
+                return false;
+              }
+            }
+            return originalEmit(event, ...args);
+          };
+        },
       },
     },
   },

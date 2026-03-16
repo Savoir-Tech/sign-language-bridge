@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Sun, Moon, MessageSquare, AlertTriangle, X, Loader2, Globe, Save } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { toast } from "sonner";
 import type { Language } from "@/types";
 import { LANGUAGE_LABELS } from "@/types";
+import { GlassPanel, GlassButton } from "@/app/components/ui/liquid-glass";
+
+const Dithering = lazy(() =>
+  import("@paper-design/shaders-react").then((mod) => ({ default: mod.Dithering }))
+);
 
 const LANGUAGES: Language[] = ["en", "es", "fr"];
 
@@ -44,18 +49,34 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
+    <div className="min-h-screen bg-brand-oceanic-deep relative overflow-hidden">
+      {/* Shader background */}
+      <Suspense fallback={<div className="absolute inset-0 bg-muted/20" />}>
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-30 mix-blend-screen">
+          <Dithering
+            colorBack="#00000000"
+            colorFront="#FFC801"
+            shape="warp"
+            type="4x4"
+            speed={0.2}
+            className="size-full"
+            minPixelRatio={1}
+          />
+        </div>
+      </Suspense>
+
+      <div className="relative z-10">
+      <header className="border-b border-white/10">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate("/app")} aria-label="Back to Dashboard" className="p-2 hover:bg-accent/10 rounded-lg transition-colors">
-              <ArrowLeft className="w-5 h-5 text-foreground" />
+              <ArrowLeft className="w-5 h-5 text-brand-arctic" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-brand-gold rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-brand-teal" />
+              <div className="w-10 h-10 bg-brand-forsytha rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-6 h-6 text-brand-oceanic" />
               </div>
-              <span className="text-foreground">Sign Language Bridge</span>
+              <span className="text-brand-arctic">Sign Language Bridge</span>
             </div>
           </div>
         </div>
@@ -63,17 +84,17 @@ export default function Settings() {
 
       <main className="container mx-auto px-6 py-12 max-w-3xl">
         <div className="mb-8">
-          <h1 className="text-foreground mb-2">Settings</h1>
-          <p className="text-muted-foreground">Manage your account, preferences, and appearance</p>
+          <h1 className="text-brand-arctic mb-2">Settings</h1>
+          <p className="text-brand-mystic">Manage your account, preferences, and appearance</p>
         </div>
 
         <div className="space-y-6">
           {/* Profile Settings */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="text-foreground mb-4">Profile</h3>
+          <GlassPanel className="rounded-xl p-6 border border-white/10">
+            <h3 className="text-brand-arctic mb-4">Profile</h3>
             <div className="space-y-4">
               <div>
-                <label htmlFor="displayName" className="block text-sm text-foreground mb-2">Display Name</label>
+                <label htmlFor="displayName" className="block text-sm text-brand-arctic mb-2">Display Name</label>
                 <input
                   id="displayName"
                   type="text"
@@ -82,23 +103,23 @@ export default function Settings() {
                     setDisplayName(e.target.value);
                     setHasChanges(true);
                   }}
-                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-input-background text-foreground focus:border-brand-gold focus:outline-none focus:ring-2 focus:ring-brand-gold/20 transition-all"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-input-background text-brand-arctic focus:border-brand-forsytha focus:outline-none focus:ring-2 focus:ring-brand-forsytha/20 transition-all"
                 />
               </div>
 
               <div>
-                <label htmlFor="userEmail" className="block text-sm text-foreground mb-2">Email</label>
+                <label htmlFor="userEmail" className="block text-sm text-brand-arctic mb-2">Email</label>
                 <input
                   id="userEmail"
                   type="email"
                   value={user?.email || ""}
                   disabled
-                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-muted/10 text-muted-foreground cursor-not-allowed"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-muted/10 text-brand-mystic cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-foreground mb-2">
+                <label className="block text-sm text-brand-arctic mb-2">
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4" />
                     Preferred Translation Language
@@ -114,8 +135,8 @@ export default function Settings() {
                       }}
                       className={`px-4 py-2 rounded-lg border transition-colors ${
                         preferredLang === lang
-                          ? "bg-brand-orange text-white border-brand-orange"
-                          : "border-border text-foreground hover:border-brand-gold/50"
+                          ? "bg-brand-saffron text-white border-brand-saffron"
+                          : "border-border text-brand-arctic hover:border-brand-forsytha/50"
                       }`}
                     >
                       {LANGUAGE_LABELS[lang]}
@@ -125,30 +146,30 @@ export default function Settings() {
               </div>
 
               {hasChanges && (
-                <button
+                <GlassButton
                   onClick={handleSaveProfile}
                   disabled={isLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+                  className="rounded-lg px-4 py-2 text-brand-arctic"
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Changes
-                </button>
+                </GlassButton>
               )}
             </div>
-          </div>
+          </GlassPanel>
 
           {/* Theme Settings */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="text-foreground mb-4">Appearance</h3>
+          <GlassPanel className="rounded-xl p-6 border border-white/10">
+            <h3 className="text-brand-arctic mb-4">Appearance</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-foreground mb-1">Theme Mode</div>
-                  <div className="text-sm text-muted-foreground">Choose between light and dark mode</div>
+                  <div className="text-brand-arctic mb-1">Theme Mode</div>
+                  <div className="text-sm text-brand-mystic">Choose between light and dark mode</div>
                 </div>
-                <button
+                <GlassButton
                   onClick={toggleTheme}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                  className="rounded-lg px-4 py-2 text-brand-arctic"
                 >
                   {theme === "dark" ? (
                     <>
@@ -161,35 +182,35 @@ export default function Settings() {
                       Dark Mode
                     </>
                   )}
-                </button>
+                </GlassButton>
               </div>
             </div>
-          </div>
+          </GlassPanel>
 
           {/* Color System */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="text-foreground mb-4">Color System</h3>
+          <GlassPanel className="rounded-xl p-6 border border-white/10">
+            <h3 className="text-brand-arctic mb-4">Color System</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <ColorSwatch color="bg-brand-teal" label="Deep Teal" description="Primary Background" />
-                <ColorSwatch color="bg-brand-gold" label="Accent Gold" description="Connection & Highlights" />
-                <ColorSwatch color="bg-brand-orange" label="Action Orange" description="CTAs & Active States" />
+                <ColorSwatch color="bg-brand-oceanic" label="Oceanic Noir" description="Primary Background" />
+                <ColorSwatch color="bg-brand-forsytha" label="Forsytha" description="Primary Accent" />
+                <ColorSwatch color="bg-brand-saffron" label="Deep Saffron" description="CTAs & Active States" />
               </div>
-              <div className="mt-4 p-4 bg-accent/10 border border-accent/30 rounded-lg">
-                <p className="text-sm text-foreground">
+              <div className="mt-4 p-4 bg-white/5 border border-white/10 rounded-lg">
+                <p className="text-sm text-brand-arctic">
                   <strong>Design Philosophy:</strong> This color system emphasizes trust, calm,
                   and precision. The restrained palette reflects the serious nature of this accessibility tool.
                 </p>
               </div>
             </div>
-          </div>
+          </GlassPanel>
 
           {/* Account Management */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="text-foreground mb-4">Account Management</h3>
+          <GlassPanel className="rounded-xl p-6 border border-white/10">
+            <h3 className="text-brand-arctic mb-4">Account Management</h3>
             <div className="space-y-4">
-              <div className="p-4 bg-muted/10 border border-muted/30 rounded-lg">
-                <p className="text-sm text-foreground mb-4">
+              <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
+                <p className="text-sm text-brand-arctic mb-4">
                   Deactivating your account will permanently delete all your sessions,
                   translation history, and personal data. This action cannot be undone.
                 </p>
@@ -201,52 +222,53 @@ export default function Settings() {
                 </button>
               </div>
             </div>
-          </div>
+          </GlassPanel>
 
           {/* About */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="text-foreground mb-4">About</h3>
-            <div className="space-y-2 text-sm text-muted-foreground">
+          <GlassPanel className="rounded-xl p-6 border border-white/10">
+            <h3 className="text-brand-arctic mb-4">About</h3>
+            <div className="space-y-2 text-sm text-brand-mystic">
               <p>
-                <strong className="text-foreground">Sign Language Bridge</strong> is a professional
+                <strong className="text-brand-arctic">Sign Language Bridge</strong> is a professional
                 accessibility tool for real-time sign language recognition and translation.
               </p>
               <p>Built for healthcare, emergency services, and critical communication infrastructure.</p>
-              <div className="pt-4 border-t border-border mt-4">
+              <div className="pt-4 border-t border-white/10 mt-4">
                 <p className="text-xs">Version 1.0.0 · February 2026</p>
               </div>
             </div>
-          </div>
+          </GlassPanel>
         </div>
       </main>
+      </div>
 
       {/* Deactivate Modal */}
       {showDeactivateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-brand-error/30 rounded-xl max-w-md w-full shadow-2xl">
-            <div className="flex items-start justify-between p-6 border-b border-border">
+          <GlassPanel className="rounded-xl max-w-md w-full shadow-2xl border border-brand-error/30">
+            <div className="flex items-start justify-between p-6 border-b border-white/10">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-brand-error/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-5 h-5 text-brand-error" />
                 </div>
                 <div>
-                  <h3 className="text-foreground mb-1">Deactivate Account</h3>
-                  <p className="text-sm text-muted-foreground">Are you sure you want to proceed?</p>
+                  <h3 className="text-brand-arctic mb-1">Deactivate Account</h3>
+                  <p className="text-sm text-brand-mystic">Are you sure you want to proceed?</p>
                 </div>
               </div>
-              <button onClick={() => setShowDeactivateModal(false)} aria-label="Close dialog" className="p-1 hover:bg-muted/10 rounded transition-colors">
-                <X className="w-5 h-5 text-muted-foreground" />
+              <button onClick={() => setShowDeactivateModal(false)} aria-label="Close dialog" className="p-1 hover:bg-white/10 rounded transition-colors">
+                <X className="w-5 h-5 text-brand-mystic" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
               <div className="bg-brand-error/5 border border-brand-error/20 rounded-lg p-4">
-                <p className="text-sm text-foreground">
+                <p className="text-sm text-brand-arctic">
                   <strong>This action is permanent and cannot be undone.</strong>
                 </p>
               </div>
-              <p className="text-sm text-muted-foreground">Deactivating your account will permanently delete:</p>
-              <ul className="text-sm text-muted-foreground space-y-2 ml-4">
+              <p className="text-sm text-brand-mystic">Deactivating your account will permanently delete:</p>
+              <ul className="text-sm text-brand-mystic space-y-2 ml-4">
                 <li className="flex items-start gap-2">
                   <span className="text-brand-error mt-1">•</span>
                   <span>All translation sessions and recordings</span>
@@ -262,21 +284,21 @@ export default function Settings() {
               </ul>
             </div>
 
-            <div className="flex gap-3 p-6 border-t border-border">
-              <button
+            <div className="flex gap-3 p-6 border-t border-white/10">
+              <GlassButton
                 onClick={() => setShowDeactivateModal(false)}
-                className="flex-1 px-4 py-2.5 bg-muted/10 border border-muted/30 text-foreground hover:bg-muted/20 rounded-lg transition-colors"
+                className="flex-1 justify-center rounded-lg px-4 py-2.5 text-brand-arctic"
               >
                 Cancel
-              </button>
+              </GlassButton>
               <button
                 onClick={handleDeactivateAccount}
-                className="flex-1 px-4 py-2.5 bg-brand-error text-brand-neutral-light hover:bg-brand-error/90 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2.5 bg-brand-error text-brand-arctic hover:bg-brand-error/90 rounded-lg transition-colors"
               >
                 Deactivate Account
               </button>
             </div>
-          </div>
+          </GlassPanel>
         </div>
       )}
     </div>
@@ -286,10 +308,10 @@ export default function Settings() {
 function ColorSwatch({ color, label, description }: { color: string; label: string; description: string }) {
   return (
     <div>
-      <div className={`w-full h-20 ${color} rounded-lg border border-border mb-2`} />
+      <div className={`w-full h-20 ${color} rounded-lg border border-white/10 mb-2`} />
       <div className="text-sm">
-        <div className="text-foreground">{label}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
+        <div className="text-brand-arctic">{label}</div>
+        <div className="text-xs text-brand-mystic">{description}</div>
       </div>
     </div>
   );

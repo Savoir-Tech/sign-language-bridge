@@ -30,18 +30,18 @@ export default class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
 
       return (
-        <div className="h-screen flex items-center justify-center bg-brand-teal">
+        <div className="h-screen flex items-center justify-center bg-brand-oceanic">
           <div className="text-center space-y-4 max-w-md p-8">
             <div className="w-16 h-16 bg-brand-error/10 rounded-full flex items-center justify-center mx-auto">
               <AlertTriangle className="w-8 h-8 text-brand-error" />
             </div>
-            <h2 className="text-brand-neutral-light text-xl">Something went wrong</h2>
-            <p className="text-brand-neutral-muted text-sm">
+            <h2 className="text-brand-arctic text-xl">Something went wrong</h2>
+            <p className="text-brand-mystic text-sm">
               {this.state.error?.message || "An unexpected error occurred."}
             </p>
             <button
               onClick={this.handleReset}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-orange text-brand-neutral-light rounded-lg hover:bg-brand-orange-dark transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-saffron text-brand-arctic rounded-lg hover:bg-brand-saffron-dark transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               Try Again

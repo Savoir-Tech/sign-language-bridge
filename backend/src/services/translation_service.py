@@ -2,6 +2,7 @@ import json
 import logging
 
 import boto3
+from botocore.exceptions import ClientError, BotoCoreError
 
 from ..config import settings
 
@@ -27,14 +28,18 @@ def translate_text(
     target: str = "en",
     cache_service=None,
 ) -> str:
+    """Synchronous translation — called via asyncio.to_thread from the WS handler."""
     if source == target:
         return text
 
-    # Check cache first
     if cache_service:
-        cached = cache_service.get_translation(text, target)
-        if cached:
-            return cached
+        try:
+            cached = cache_service.get_translation(text, target)
+            if cached:
+                logger.debug(f"Translation cache hit: {text[:30]}...")
+                return cached
+        except Exception as e:
+            logger.warning(f"Redis cache lookup failed: {e}")
 
     source_name = LANGUAGE_NAMES.get(source, "English")
     target_name = LANGUAGE_NAMES.get(target, "English")
@@ -66,14 +71,19 @@ def translate_text(
         result = json.loads(response["body"].read())
         translated = result["output"]["message"]["content"][0]["text"].strip()
 
-        # Cache the translation
         if cache_service:
-            cache_service.set_translation(
-                text, target, translated, settings.TRANSLATION_CACHE_TTL
-            )
+            try:
+                cache_service.set_translation(
+                    text, target, translated, settings.TRANSLATION_CACHE_TTL
+                )
+            except Exception as e:
+                logger.warning(f"Redis cache write failed: {e}")
 
         return translated
 
+    except (ClientError, BotoCoreError) as e:
+        logger.error(f"Bedrock translation failed: {e}")
+        return text
     except Exception as e:
-        logger.error(f"Translation failed: {e}")
+        logger.error(f"Translation failed: {e}", exc_info=True)
         return text

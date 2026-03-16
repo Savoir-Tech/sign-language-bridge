@@ -23,22 +23,9 @@ from config import (
 
 
 def downsample(frames: np.ndarray, max_frames: int) -> np.ndarray:
-    """Uniformly downsample a frame sequence to at most *max_frames*."""
-    length = frames.shape[0]
-    increment = max_frames / length
-    if increment > 1.0:
-        increment = 1.0
-    curr_increment = 0.0
-    curr_frame = 0
-    selected = []
-    for f in frames:
-        curr_increment += increment
-        if curr_increment > curr_frame:
-            curr_frame += 1
-            selected.append(f)
-    if len(selected) > max_frames:
-        selected = selected[:max_frames]
-    return np.array(selected)
+    """Uniformly downsample a frame sequence to exactly *max_frames*."""
+    indices = np.linspace(0, len(frames) - 1, max_frames, dtype=int)
+    return frames[indices]
 
 
 class ASLCitizenDataset(data_utl.Dataset):
@@ -93,26 +80,23 @@ class ASLCitizenDataset(data_utl.Dataset):
         return len(self.pose_paths)
 
     def __getitem__(self, index):
-        data = np.load(self.pose_paths[index])
+        data = np.load(self.pose_paths[index]).astype(np.float32)
         label_idx = self.labels[index]
 
-        # One-hot label
-        label = np.zeros(len(self.gloss_dict), dtype=np.float64)
-        label[label_idx] = 1.0
-
-        # Temporal adjustment
         if data.shape[0] > self.max_frames:
             data = downsample(data, self.max_frames)
-        if data.shape[0] < self.max_frames:
-            data = np.pad(data, ((0, self.max_frames - data.shape[0]), (0, 0), (0, 0)))
 
-        # Normalize using mean shoulder distance and center
-        shoulder_l = data[:, 11, :]  # left shoulder
-        shoulder_r = data[:, 12, :]  # right shoulder
+        # Normalize on REAL frames (before padding) so padded zeros stay zero
+        n_real = data.shape[0]
+        shoulder_l = data[:, 11, :]
+        shoulder_r = data[:, 12, :]
         center = np.mean((shoulder_l + shoulder_r) / 2, axis=0)
         mean_dist = np.mean(np.sqrt(((shoulder_l - shoulder_r) ** 2).sum(-1)))
         if mean_dist > 0:
             data = (data - center) / mean_dist
+
+        if n_real < self.max_frames:
+            data = np.pad(data, ((0, self.max_frames - n_real), (0, 0), (0, 0)))
 
         # Keep only pose + hands (first 75 landmarks), reorder to [pose, LH, RH]
         data = data[:, :NUM_UPPER_BODY_LANDMARKS, :]
@@ -132,4 +116,4 @@ class ASLCitizenDataset(data_utl.Dataset):
         info = self.video_info[index]
         name_dict = {"user": info[0], "filename": info[1], "gloss": info[2]}
 
-        return tensor.double(), name_dict, torch.tensor(label, dtype=torch.float64)
+        return tensor.float(), name_dict, torch.tensor(label_idx, dtype=torch.long)

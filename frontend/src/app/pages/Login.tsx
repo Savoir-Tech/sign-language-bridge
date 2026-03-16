@@ -8,19 +8,13 @@ const Dithering = lazy(() =>
 import { useAuthStore } from "@/lib/stores/authStore";
 import { toast } from "sonner";
 
-export default function Auth() {
+export default function Login() {
   const navigate = useNavigate();
-  const { register, isLoading, error, clearError, token } = useAuthStore();
+  const { login, isLoading, error, clearError, token } = useAuthStore();
 
   const [isHovered, setIsHovered] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   if (token) {
@@ -41,40 +35,21 @@ export default function Auth() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
-    if (!formData.fullName.trim()) newErrors.fullName = "Full name is required";
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
-    }
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
-    }
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    if (!formData.password) newErrors.password = "Password is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const isFormValid = () =>
-    formData.fullName.trim() &&
-    formData.email.trim() &&
-    formData.password &&
-    formData.confirmPassword &&
-    formData.password === formData.confirmPassword;
+  const isFormValid = () => formData.email.trim() && formData.password;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     try {
-      await register(formData.email, formData.password, formData.fullName);
-      toast.success("Account created successfully!");
+      await login(formData.email, formData.password);
+      toast.success("Welcome back!");
     } catch {
       // Error is set in the store
     }
@@ -113,12 +88,13 @@ export default function Auth() {
           </div>
 
           <h1 className="text-brand-arctic text-5xl xl:text-6xl mb-6 leading-tight">
-            Break Communication<br />Barriers.
+            Welcome Back.
           </h1>
 
           <p className="text-brand-arctic/80 text-lg xl:text-xl leading-relaxed max-w-xl">
-            Real-time sign language recognition and translation built for healthcare professionals,
-            emergency services, and critical communication infrastructure.
+            Sign in to continue using real-time sign language recognition
+            and translation — built for healthcare, emergency services, and
+            critical communication.
           </p>
 
           <div className="mt-12 flex gap-2">
@@ -136,7 +112,7 @@ export default function Auth() {
         </div>
       </div>
 
-      {/* Right Panel - Signup Form */}
+      {/* Right Panel - Login Form */}
       <div className="flex-1 lg:w-[40%] bg-brand-arctic flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md">
           <button
@@ -159,15 +135,15 @@ export default function Auth() {
           <div className="bg-white rounded-2xl shadow-lg border border-brand-oceanic/10 p-8 sm:p-10">
             <div className="mb-8">
               <h2 className="text-brand-oceanic text-2xl sm:text-3xl mb-2">
-                Create Your Account
+                Welcome Back
               </h2>
               <p className="text-brand-oceanic/60 text-sm">
-                Already have an account?{" "}
+                Don't have an account?{" "}
                 <button
-                  onClick={() => navigate("/login")}
+                  onClick={() => navigate("/auth")}
                   className="text-brand-forsytha hover:text-brand-saffron transition-colors font-medium"
                 >
-                  Log in
+                  Create account
                 </button>
               </p>
             </div>
@@ -179,23 +155,6 @@ export default function Auth() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-brand-oceanic text-sm mb-2">Full Name</label>
-                <input
-                  type="text"
-                  value={formData.fullName}
-                  onChange={(e) => handleInputChange("fullName", e.target.value)}
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.fullName
-                      ? "border-brand-error focus:border-brand-error"
-                      : "border-brand-oceanic/20 focus:border-brand-forsytha"
-                  } focus:outline-none focus:ring-2 focus:ring-brand-forsytha/20 transition-all`}
-                  placeholder="Enter your full name"
-                  disabled={isLoading}
-                />
-                {errors.fullName && <p className="text-brand-error text-xs mt-1">{errors.fullName}</p>}
-              </div>
-
               <div>
                 <label className="block text-brand-oceanic text-sm mb-2">Email Address</label>
                 <input
@@ -225,7 +184,7 @@ export default function Auth() {
                         ? "border-brand-error focus:border-brand-error"
                         : "border-brand-oceanic/20 focus:border-brand-forsytha"
                     } focus:outline-none focus:ring-2 focus:ring-brand-forsytha/20 transition-all`}
-                    placeholder="Create a password (min. 8 characters)"
+                    placeholder="Enter your password"
                     disabled={isLoading}
                   />
                   <button
@@ -239,30 +198,13 @@ export default function Auth() {
                 {errors.password && <p className="text-brand-error text-xs mt-1">{errors.password}</p>}
               </div>
 
-              <div>
-                <label className="block text-brand-oceanic text-sm mb-2">Confirm Password</label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                    className={`w-full px-4 py-3 pr-12 rounded-xl border ${
-                      errors.confirmPassword
-                        ? "border-brand-error focus:border-brand-error"
-                        : "border-brand-oceanic/20 focus:border-brand-forsytha"
-                    } focus:outline-none focus:ring-2 focus:ring-brand-forsytha/20 transition-all`}
-                    placeholder="Re-enter your password"
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-oceanic/40 hover:text-brand-forsytha transition-colors"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                {errors.confirmPassword && <p className="text-brand-error text-xs mt-1">{errors.confirmPassword}</p>}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="text-brand-forsytha hover:text-brand-saffron text-sm transition-colors"
+                >
+                  Forgot Password?
+                </button>
               </div>
 
               <button
@@ -275,7 +217,7 @@ export default function Auth() {
                 }`}
               >
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Create Account
+                Log In
               </button>
 
               <div className="relative py-4">
@@ -301,13 +243,6 @@ export default function Auth() {
                   <span className="text-brand-oceanic text-sm">Continue with Google</span>
                 </button>
               </div>
-
-              <p className="text-brand-oceanic/50 text-xs text-center leading-relaxed pt-2">
-                By creating an account, you agree to our{" "}
-                <button type="button" className="text-brand-forsytha hover:underline">Terms of Service</button>{" "}
-                and{" "}
-                <button type="button" className="text-brand-forsytha hover:underline">Privacy Policy</button>.
-              </p>
             </form>
           </div>
 

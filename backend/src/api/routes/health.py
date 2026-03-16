@@ -16,8 +16,12 @@ async def health_check():
     except Exception:
         checks["redis"] = "error"
 
-    # Check model
-    checks["model"] = "ok" if model_service.model is not None else "not_loaded"
+    if model_service.model_loaded:
+        checks["model"] = "ok"
+    elif model_service.demo_mode:
+        checks["model"] = "demo"
+    else:
+        checks["model"] = "not_loaded"
 
     # Check PostgreSQL
     try:
@@ -29,7 +33,7 @@ async def health_check():
     except Exception:
         checks["postgres"] = "error"
 
-    all_ok = all(v == "ok" for v in checks.values())
+    all_ok = all(v in ("ok", "demo") for v in checks.values())
     return {
         "status": "healthy" if all_ok else "degraded",
         "checks": checks,

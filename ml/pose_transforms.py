@@ -37,7 +37,7 @@ class ShearTransform:
         shear_matrix = torch.eye(2)
         shear_matrix[0, 1] = float(np.random.normal(0, self.shear_std))
         result = torch.matmul(x.float(), shear_matrix).permute(2, 0, 1)  # TVC → CTV
-        return result.double()
+        return result
 
 
 class RotationTransform:
@@ -57,4 +57,4 @@ class RotationTransform:
         cos_a, sin_a = np.cos(angle), np.sin(angle)
         rot = torch.tensor([[cos_a, -sin_a], [sin_a, cos_a]], dtype=torch.float32)
         result = torch.matmul(x.float(), rot).permute(2, 0, 1)  # TVC → CTV
-        return result.double()
+        return result

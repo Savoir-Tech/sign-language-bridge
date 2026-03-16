@@ -3,6 +3,7 @@ import { RouterProvider } from "react-router";
 import { router } from "./routes";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { Toaster } from "sonner";
+import { GlassFilter } from "@/app/components/ui/liquid-glass";
 
 export default function App() {
   const loadUser = useAuthStore((s) => s.loadUser);
@@ -17,15 +18,16 @@ export default function App() {
 
   return (
     <>
+      <GlassFilter />
       <RouterProvider router={router} />
       <Toaster
         position="top-right"
         richColors
         toastOptions={{
           style: {
-            background: "var(--brand-teal-light)",
-            border: "1px solid rgba(216, 154, 61, 0.2)",
-            color: "var(--brand-neutral-light)",
+            background: "var(--brand-nocturnal)",
+            border: "1px solid rgba(255, 200, 1, 0.2)",
+            color: "var(--brand-arctic)",
           },
         }}
       />

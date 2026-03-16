@@ -4,80 +4,80 @@
   --font-size: 16px;
   
   /* Sign Language Bridge Official Color System */
-  --brand-teal: #1F3A44;
-  --brand-teal-light: #243F49;
-  --brand-teal-panel: #1B333B;
-  --brand-teal-hover: #2B4A54;
-  --brand-gold: #D89A3D;
-  --brand-gold-light: #E3A94F;
-  --brand-orange: #E2582D;
-  --brand-orange-dark: #C9471F;
-  --brand-neutral-light: #F2F2F0;
-  --brand-neutral-muted: #CFCFCB;
+  --brand-oceanic: #172B36;
+  --brand-nocturnal: #114C5A;
+  --brand-oceanic-deep: #0F1F28;
+  --brand-nocturnal-hover: #1A6B7A;
+  --brand-forsytha: #FFC801;
+  --brand-forsytha-light: #FFD644;
+  --brand-saffron: #FF9932;
+  --brand-saffron-dark: #E6851F;
+  --brand-arctic: #F1F6F4;
+  --brand-mystic: #D9E8E2;
   --brand-error: #B94141;
   
-  /* Default theme (Light Mode for Settings) */
-  --background: #F5F7F6;
-  --foreground: #1F3A44;
+  /* Default theme (Light Mode) */
+  --background: #F1F6F4;
+  --foreground: #172B36;
   --card: #ffffff;
-  --card-foreground: #1F3A44;
+  --card-foreground: #172B36;
   --popover: #ffffff;
-  --popover-foreground: #1F3A44;
-  --primary: #E2582D;
-  --primary-foreground: #F2F2F0;
-  --secondary: #D89A3D;
-  --secondary-foreground: #1F3A44;
-  --muted: #CFCFCB;
-  --muted-foreground: #1F3A44;
-  --accent: #D89A3D;
-  --accent-foreground: #1F3A44;
+  --popover-foreground: #172B36;
+  --primary: #FFC801;
+  --primary-foreground: #172B36;
+  --secondary: #FF9932;
+  --secondary-foreground: #172B36;
+  --muted: #D9E8E2;
+  --muted-foreground: #114C5A;
+  --accent: #FF9932;
+  --accent-foreground: #172B36;
   --destructive: #B94141;
-  --destructive-foreground: #F2F2F0;
-  --border: rgba(31, 58, 68, 0.1);
+  --destructive-foreground: #F1F6F4;
+  --border: rgba(23, 43, 54, 0.15);
   --input: transparent;
   --input-background: #ffffff;
-  --switch-background: #CFCFCB;
+  --switch-background: #D9E8E2;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #D89A3D;
+  --ring: #FFC801;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: #1F3A44;
-  --sidebar-foreground: #F2F2F0;
-  --sidebar-primary: #E2582D;
-  --sidebar-primary-foreground: #F2F2F0;
-  --sidebar-accent: #2B4A54;
-  --sidebar-accent-foreground: #F2F2F0;
-  --sidebar-border: #243F49;
-  --sidebar-ring: #D89A3D;
+  --sidebar: rgba(17, 76, 90, 0.15);
+  --sidebar-foreground: #F1F6F4;
+  --sidebar-primary: #FFC801;
+  --sidebar-primary-foreground: #172B36;
+  --sidebar-accent: rgba(26, 107, 122, 0.4);
+  --sidebar-accent-foreground: #F1F6F4;
+  --sidebar-border: rgba(23, 43, 54, 0.3);
+  --sidebar-ring: #FFC801;
 }
 
 .dark {
-  /* Sign Language Bridge Dark Mode (Primary Mode) */
-  --background: #1F3A44;
-  --foreground: #F2F2F0;
-  --card: #243F49;
-  --card-foreground: #F2F2F0;
-  --popover: #243F49;
-  --popover-foreground: #F2F2F0;
-  --primary: #E2582D;
-  --primary-foreground: #F2F2F0;
-  --secondary: #D89A3D;
-  --secondary-foreground: #F2F2F0;
-  --muted: #CFCFCB;
-  --muted-foreground: #F2F2F0;
-  --accent: #D89A3D;
-  --accent-foreground: #F2F2F0;
+  /* Sign Language Bridge Dark Mode */
+  --background: #172B36;
+  --foreground: #F1F6F4;
+  --card: #114C5A;
+  --card-foreground: #F1F6F4;
+  --popover: #114C5A;
+  --popover-foreground: #F1F6F4;
+  --primary: #FFC801;
+  --primary-foreground: #172B36;
+  --secondary: #FF9932;
+  --secondary-foreground: #F1F6F4;
+  --muted: #D9E8E2;
+  --muted-foreground: #F1F6F4;
+  --accent: #FF9932;
+  --accent-foreground: #F1F6F4;
   --destructive: #B94141;
-  --destructive-foreground: #F2F2F0;
-  --border: rgba(242, 242, 240, 0.1);
-  --input: rgba(242, 242, 240, 0.1);
-  --input-background: #1B333B;
-  --ring: #D89A3D;
+  --destructive-foreground: #F1F6F4;
+  --border: rgba(241, 246, 244, 0.1);
+  --input: rgba(241, 246, 244, 0.1);
+  --input-background: #0F1F28;
+  --ring: #FFC801;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --chart-1: oklch(0.488 0.243 264.376);
@@ -85,28 +85,28 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: #1F3A44;
-  --sidebar-foreground: #F2F2F0;
-  --sidebar-primary: #E2582D;
-  --sidebar-primary-foreground: #F2F2F0;
-  --sidebar-accent: #2B4A54;
-  --sidebar-accent-foreground: #F2F2F0;
-  --sidebar-border: #243F49;
-  --sidebar-ring: #D89A3D;
+  --sidebar: rgba(17, 76, 90, 0.15);
+  --sidebar-foreground: #F1F6F4;
+  --sidebar-primary: #FFC801;
+  --sidebar-primary-foreground: #172B36;
+  --sidebar-accent: rgba(26, 107, 122, 0.4);
+  --sidebar-accent-foreground: #F1F6F4;
+  --sidebar-border: rgba(23, 43, 54, 0.3);
+  --sidebar-ring: #FFC801;
 }
 
 @theme inline {
   /* Brand Colors */
-  --color-brand-teal: var(--brand-teal);
-  --color-brand-teal-light: var(--brand-teal-light);
-  --color-brand-teal-panel: var(--brand-teal-panel);
-  --color-brand-teal-hover: var(--brand-teal-hover);
-  --color-brand-gold: var(--brand-gold);
-  --color-brand-gold-light: var(--brand-gold-light);
-  --color-brand-orange: var(--brand-orange);
-  --color-brand-orange-dark: var(--brand-orange-dark);
-  --color-brand-neutral-light: var(--brand-neutral-light);
-  --color-brand-neutral-muted: var(--brand-neutral-muted);
+  --color-brand-oceanic: var(--brand-oceanic);
+  --color-brand-nocturnal: var(--brand-nocturnal);
+  --color-brand-oceanic-deep: var(--brand-oceanic-deep);
+  --color-brand-nocturnal-hover: var(--brand-nocturnal-hover);
+  --color-brand-forsytha: var(--brand-forsytha);
+  --color-brand-forsytha-light: var(--brand-forsytha-light);
+  --color-brand-saffron: var(--brand-saffron);
+  --color-brand-saffron-dark: var(--brand-saffron-dark);
+  --color-brand-arctic: var(--brand-arctic);
+  --color-brand-mystic: var(--brand-mystic);
   --color-brand-error: var(--brand-error);
   
   /* Standard Colors */
@@ -209,4 +209,19 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    color: #000000 !important;
+  }
+}
+
+/* Liquid glass effect for sidebar */
+[data-sidebar="sidebar"] {
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 2px 2px 1px 0 rgba(255, 255, 255, 0.12),
+    inset -1px -1px 1px 1px rgba(255, 255, 255, 0.08);
 }

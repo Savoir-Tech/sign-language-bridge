@@ -106,11 +106,7 @@ Outputs top-1/5/10/20 accuracy, DCG, MRR, confusion matrices, and per-user stati
 
 ### 7. Export for Backend
 
-```bash
-python export_model.py --checkpoint trained_models/best_model.pt
-```
-
-This copies the model weights and vocabulary to `backend/trained_models/` where the API server can load them at startup.
+copy the model weights and vocabulary to `backend/trained_models/` where the API server can load them at startup.
 
 ### Automated Pipeline
 

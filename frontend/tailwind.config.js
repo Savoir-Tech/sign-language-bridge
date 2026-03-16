@@ -3,28 +3,6 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
-      colors: {
-        ink: {
-          950: '#0a0a0f',
-          900: '#0f0f1a',
-          800: '#16162a',
-          700: '#1e1e35',
-          600: '#2a2a45',
-        },
-        cyan: {
-          400: '#22d3ee',
-          500: '#06b6d4',
-          600: '#0891b2',
-        },
-        violet: {
-          400: '#a78bfa',
-          500: '#8b5cf6',
-        },
-        emerald: {
-          400: '#34d399',
-          500: '#10b981',
-        },
-      },
       fontFamily: {
         display: ['"Space Mono"', 'monospace'],
         body: ['"DM Sans"', 'sans-serif'],
@@ -51,12 +29,12 @@ export default {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         glow: {
-          '0%': { boxShadow: '0 0 5px #22d3ee33, 0 0 20px #22d3ee11' },
-          '100%': { boxShadow: '0 0 15px #22d3ee66, 0 0 40px #22d3ee22' },
+          '0%': { boxShadow: '0 0 5px rgba(255,200,1,0.2), 0 0 20px rgba(255,200,1,0.07)' },
+          '100%': { boxShadow: '0 0 15px rgba(255,200,1,0.4), 0 0 40px rgba(255,200,1,0.13)' },
         },
       },
       backgroundImage: {
-        'grid-pattern': 'linear-gradient(rgba(34,211,238,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.03) 1px, transparent 1px)',
+        'grid-pattern': 'linear-gradient(rgba(255,200,1,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,200,1,0.03) 1px, transparent 1px)',
       },
       backgroundSize: {
         'grid': '40px 40px',

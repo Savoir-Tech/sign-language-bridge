@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # PostgreSQL
-    DATABASE_URL: str = "postgresql://admin:password@postgres:5432/signbridge"
+    DATABASE_URL: str = "postgresql://admin:password@localhost:5432/signbridge"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     JWT_EXPIRY_HOURS: int = 24
 
     # Model
-    MODEL_PATH: str = "trained_models/asl_stgcn.pt"
+    MODEL_PATH: str = "trained_models/best_model.pt"
     VOCAB_PATH: str = "trained_models/sign_vocab.json"
     CONFIDENCE_THRESHOLD: float = 0.75
 

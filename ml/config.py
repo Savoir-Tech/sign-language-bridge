@@ -73,7 +73,10 @@ DROPOUT_RATIO = 0.05
 # Training defaults
 # ---------------------------------------------------------------------------
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-4
 MAX_EPOCHS = 100
-SCHEDULER_T_MAX = 10
-NUM_WORKERS = 3
+NUM_WORKERS = 0
+LABEL_SMOOTHING = 0.1
+WEIGHT_DECAY = 1e-4
+WARMUP_EPOCHS = 5
+GRAD_CLIP_NORM = 1.0

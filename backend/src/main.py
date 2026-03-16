@@ -37,10 +37,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Redis connection failed: {e}")
 
-    # Load ML model
+    # Load ML model (falls back to demo mode if .pt file is missing)
     try:
         model_service.load_model(settings.MODEL_PATH, settings.VOCAB_PATH)
-        logger.info("ML model loaded")
+        logger.info(
+            "MODEL STATUS: loaded=%s demo=%s seq_len=%d vocab_size=%d",
+            model_service.model_loaded,
+            model_service.demo_mode,
+            model_service.sequence_length,
+            len(model_service.vocab) if model_service.vocab else 0,
+        )
+        if model_service.demo_mode:
+            logger.info("ML model running in DEMO mode (no .pt file)")
+        else:
+            logger.info("ML model loaded")
     except Exception as e:
         logger.warning(f"Model loading failed (will run without inference): {e}")
 

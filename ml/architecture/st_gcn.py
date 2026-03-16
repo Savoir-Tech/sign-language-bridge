@@ -107,7 +107,7 @@ class STGCN(nn.Module):
             center=graph_args["center"],
             inward_edges=graph_args["inward_edges"],
         )
-        A = torch.tensor(self.graph.A, dtype=torch.float32, requires_grad=False)
+        A = torch.tensor(self.graph.A, dtype=torch.float32)
         self.register_buffer("A", A)
 
         spatial_kernel_size = A.size(0)
