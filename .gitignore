@@ -377,3 +377,4 @@ setup_venv.bat
 setup_venv.sh
 .vscode
 docs/
+scripts/
