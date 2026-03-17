@@ -3,6 +3,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from .config import settings
 from .services.cache_service import CacheService
@@ -22,6 +26,13 @@ db_service = DatabaseService()
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Sign Language Bridge API...")
+
+    # Production safety: reject weak JWT_SECRET
+    if settings.ENVIRONMENT == "production" and settings.JWT_SECRET == "change-this-secret-in-production":
+        raise ValueError(
+            "JWT_SECRET must be set to a strong random value in production. "
+            "Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
 
     # Connect PostgreSQL
     try:
@@ -64,9 +75,26 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sign Language Bridge", lifespan=lifespan)
 
+# Rate limiting: 100/min per IP globally
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Security headers
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
+# CORS: use CORS_ORIGINS env var (comma-separated)
+_cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,29 @@
+# Render.com blueprint for Sign Language Bridge backend
+# Database: Use Supabase (set DATABASE_URL manually)
+# Redis: Add Render Redis add-on, or set REDIS_URL from Railway/Upstash
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: sign-language-bridge-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: PORT
+        generateValue: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: ENVIRONMENT
+        value: production

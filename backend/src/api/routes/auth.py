@@ -89,8 +89,10 @@ async def login(request: LoginRequest):
         "token_type": "bearer",
         "user": {
             "id": str(user["id"]),
+            "email": user["email"],
             "display_name": user["display_name"],
             "preferred_lang": user["preferred_lang"],
+            "created_at": user["created_at"].isoformat(),
         },
     }
 

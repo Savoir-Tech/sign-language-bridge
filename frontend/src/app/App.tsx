@@ -7,6 +7,7 @@ import { GlassFilter } from "@/app/components/ui/liquid-glass";
 
 export default function App() {
   const loadUser = useAuthStore((s) => s.loadUser);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -15,6 +16,12 @@ export default function App() {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  useEffect(() => {
+    const onLogout = () => logout();
+    window.addEventListener("auth:logout", onLogout);
+    return () => window.removeEventListener("auth:logout", onLogout);
+  }, [logout]);
 
   return (
     <>

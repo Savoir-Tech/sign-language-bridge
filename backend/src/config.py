@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # PORT is injected by Railway/Render; BACKEND_PORT for local/docker
+    PORT: int | None = None
     BACKEND_PORT: int = 8000
     ENVIRONMENT: str = "development"
 
@@ -10,6 +12,9 @@ class Settings(BaseSettings):
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
+
+    # CORS (comma-separated origins, e.g. "https://app.vercel.app,https://custom.com")
+    CORS_ORIGINS: str = "http://localhost:5173"
 
     # AWS
     AWS_REGION: str = "us-east-1"

@@ -376,3 +376,4 @@ run_training.sh
 setup_venv.bat
 setup_venv.sh
 .vscode
+docs/

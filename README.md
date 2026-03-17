@@ -292,6 +292,15 @@ npm run preview       # Preview production build locally
 npm run type-check    # TypeScript type checking only
 ```
 
+## Environment Variables
+
+Copy [.env.example](.env.example) to `.env` and configure. Required for production:
+
+- **Backend:** `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+- **Frontend (Vercel):** `VITE_API_URL`, `VITE_WS_URL` — set to your backend URL
+
+See `.env.example` for full list and deployment notes (Supabase, Railway, Render).
+
 ## Demo Flow
 
 ```
