@@ -1,8 +1,36 @@
+import ssl
 import asyncpg
 import logging
+from urllib.parse import urlparse, unquote, parse_qs
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_db_url(url: str) -> dict:
+    """Parse DATABASE_URL into connection params. Avoids asyncpg's DSN parser
+    which fails on IPv6 addresses and special characters in passwords."""
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    parsed = urlparse(url)
+    params = {
+        "host": parsed.hostname or "localhost",
+        "port": parsed.port or 5432,
+        "user": unquote(parsed.username) if parsed.username else "postgres",
+        "password": unquote(parsed.password) if parsed.password else None,
+        "database": (parsed.path or "/postgres").lstrip("/") or "postgres",
+    }
+    # Supabase and most cloud DBs require SSL
+    qs = parse_qs(parsed.query) if parsed.query else {}
+    sslmode = (qs.get("sslmode") or [None])[0]
+    needs_ssl = (
+        sslmode in ("require", "verify-ca", "verify-full")
+        or "supabase.com" in (params["host"] or "")
+        or "pooler.supabase.com" in (params["host"] or "")
+    )
+    if needs_ssl:
+        params["ssl"] = ssl.create_default_context()
+    return params
 
 
 class DatabaseService:
@@ -10,7 +38,12 @@ class DatabaseService:
         self.pool = None
 
     async def connect(self, database_url: str):
-        self.pool = await asyncpg.create_pool(database_url, min_size=5, max_size=20)
+        params = _parse_db_url(database_url)
+        self.pool = await asyncpg.create_pool(
+            min_size=5,
+            max_size=20,
+            **params,
+        )
         logger.info("PostgreSQL connected")
 
     async def disconnect(self):
